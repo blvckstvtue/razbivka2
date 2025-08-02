@@ -17,9 +17,10 @@ enum SoundType {
     Sound_Last
 };
 
-// Arrays to store sound paths for each weapon
-new String:g_szWeaponSounds[2048][Sound_Last][PLATFORM_MAX_PATH];
-new g_iWeaponSoundCount = 0;
+// Advanced sound system from patch_fix_decompiled.sp
+new Handle:g_hTrieSounds[MAXPLAYERS+1][2];
+new bool:HasSoundAt[MAXPLAYERS+1][14];
+new bool:StopSounds[MAXPLAYERS+1];
 
 #define GAME_UNDEFINED 0
 #define GAME_CSS_34 1
@@ -161,154 +162,24 @@ GetCSGame()
 	return GAME_UNDEFINED;
 }
 
-ParseWeaponSounds()
+// Advanced sound hook for custom weapon sounds - from patch_fix_decompiled.sp
+public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &entity, &channel, &Float:volume, &level, &pitch, &flags)
 {
-    decl String:path[PLATFORM_MAX_PATH];
-    BuildPath(Path_SM, path, sizeof(path), "configs/custom_weapons.txt");
-    
-    new Handle:kv = CreateKeyValues("Weapons");
-    if (!FileToKeyValues(kv, path))
-    {
-        CloseHandle(kv);
-        return;
-    }
-    
-    if (KvGotoFirstSubKey(kv))
-    {
-        decl String:weapon[64], String:skin[64];
-        
-        do
-        {
-            KvGetSectionName(kv, weapon, sizeof(weapon));
-            
-            if (KvGotoFirstSubKey(kv))
-            {
-                do
-                {
-                    KvGetSectionName(kv, skin, sizeof(skin));
-                    
-                    if (KvJumpToKey(kv, "Sounds"))
-                    {
-                        new soundIndex = g_iWeaponSoundCount++;
-                        
-                        // Load fire sound
-                        KvGetString(kv, "fire", g_szWeaponSounds[soundIndex][Sound_Fire], PLATFORM_MAX_PATH);
-                        
-                        // Load clip out sound
-                        KvGetString(kv, "clipout", g_szWeaponSounds[soundIndex][Sound_ClipOut], PLATFORM_MAX_PATH);
-                        
-                        // Load clip in sound
-                        KvGetString(kv, "clipin", g_szWeaponSounds[soundIndex][Sound_ClipIn], PLATFORM_MAX_PATH);
-                        
-                        // Precache sounds if they exist
-                        if (g_szWeaponSounds[soundIndex][Sound_Fire][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_Fire]);
-                        }
-                        if (g_szWeaponSounds[soundIndex][Sound_ClipOut][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_ClipOut]);
-                        }
-                        if (g_szWeaponSounds[soundIndex][Sound_ClipIn][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_ClipIn]);
-                        }
-                        
-                        KvGoBack(kv);
-                    }
-                } while (KvGotoNextKey(kv));
-                KvGoBack(kv);
-            }
-        } while (KvGotoNextKey(kv));
-    }
-    
-    CloseHandle(kv);
-}
-
-PlayWeaponSound(client, const String:weapon[], SoundType:soundType)
-{
-    if (!IsClientInGame(client) || !IsPlayerAlive(client))
-        return;
-    
-    decl String:weaponName[64];
-    strcopy(weaponName, sizeof(weaponName), weapon);
-    
-    // Remove 'weapon_' prefix if it exists
-    if (StrContains(weaponName, "weapon_") == 0)
-        strcopy(weaponName, sizeof(weaponName), weaponName[7]);
-    
-    // Find the weapon in our sound array
-    for (new i = 0; i < g_iWeaponSoundCount; i++)
-    {
-        if (StrEqual(weaponName, g_szWeaponSounds[i][soundType], false))
-        {
-            if (g_szWeaponSounds[i][soundType][0] != '\0')
-            {
-                decl String:soundPath[PLATFORM_MAX_PATH];
-                Format(soundPath, sizeof(soundPath), "sound/%s", g_szWeaponSounds[i][soundType]);
-                EmitSoundToAll(soundPath, client, SNDCHAN_WEAPON, SNDLEVEL_NORMAL, SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-            }
-            break;
-        }
-    }
-}
-
-public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroadcast)
-{
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Continue;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Continue;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    PlayWeaponSound(client, weaponName, Sound_Fire);
-    
-    return Plugin_Continue;
-}
-
-public Action:Event_WeaponReload(Handle:event, const String:name[], bool:dontBroadcast)
-{
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Continue;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Continue;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    // Play clip out sound at the start of reload
-    PlayWeaponSound(client, weaponName, Sound_ClipOut);
-    
-    // Play clip in sound after a short delay (adjust timing as needed)
-    CreateTimer(0.5, Timer_PlayClipInSound, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
-    
-    return Plugin_Continue;
-}
-
-public Action:Timer_PlayClipInSound(Handle:timer, any:userid)
-{
-    new client = GetClientOfUserId(userid);
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Stop;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Stop;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    PlayWeaponSound(client, weaponName, Sound_ClipIn);
-    
-    return Plugin_Stop;
+	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == SNDCHAN_WEAPON || channel == SNDCHAN_AUTO) && volume > 0.0)
+	{
+		// Only stop default weapon sounds if the weapon has custom sounds configured
+		new weapon = CSPlayer_GetActiveWeapon(entity);
+		if (weapon != -1)
+		{
+			new Sequence = CSViewModel_GetSequence(ClientVM[entity]);
+			// Stop default sounds only if this weapon has custom sounds OR stop_all_sounds is enabled
+			if (HasSoundAt[entity][Sequence] || StopSounds[entity])
+			{
+				return Plugin_Stop;
+			}
+		}
+	}
+	return Plugin_Continue;
 }
 
 public OnPluginStart()
@@ -376,6 +247,9 @@ public OnPluginStart()
 	HookEvent("player_spawn", OnPlayerSpawn);
 	HookEvent("bomb_planted", OnBombPlanted);
 	HookEvent("round_start", OnRoundStart, EventHookMode_PostNoCopy);
+	
+	// Add sound hook for custom weapon sounds
+	AddNormalSoundHook(NormalSoundHook);
 	
 	RegAdminCmd("cw_dev", Command_Dev, ADMFLAG_ROOT);
 	
@@ -827,6 +701,27 @@ CacheModels(Handle:kv)
 						{
 							KvSetString(kv, "planted_world_model", "");
 						}
+						
+						// Load and precache sounds from the Sounds section
+						if (KvJumpToKey(kv, "Sounds"))
+						{
+							KvSavePosition(kv);
+							if (KvGotoFirstSubKey(kv))
+							{
+								do
+								{
+									KvGetSectionName(kv, buffer, sizeof(buffer));
+									if (buffer[0] && IsSoundFile(buffer))
+									{
+										PrecacheSound(buffer);
+										Format(buffer, sizeof(buffer), "sound/%s", buffer);
+										AddFileToDownloadsTable(buffer);
+									}
+								} while (KvGotoNextKey(kv));
+								KvGoBack(kv);
+							}
+							KvGoBack(kv);
+						}
 					} while (KvGotoNextKey(kv));
 					
 					KvRewind(kv);
@@ -853,6 +748,15 @@ public Action:Command_Dev(client, argc)
 
 public OnClientConnected(client)
 {
+	// Initialize sound tries
+	if (g_hTrieSounds[client][0] == INVALID_HANDLE)
+	{
+		g_hTrieSounds[client][0] = CreateTrie();
+	}
+	if (g_hTrieSounds[client][1] == INVALID_HANDLE)
+	{
+		g_hTrieSounds[client][1] = CreateTrie();
+	}
 	if (g_hTrieSequence[client] == INVALID_HANDLE)
 	{
 		g_hTrieSequence[client] = CreateTrie();
@@ -966,7 +870,16 @@ public OnClientDisconnect_Post(client)
 	weapon_switch[client] = INVALID_FUNCTION;
 	weapon_sequence[client] = INVALID_FUNCTION;
 	
+	ClearTrie(g_hTrieSounds[client][0]);
+	ClearTrie(g_hTrieSounds[client][1]);
 	ClearTrie(g_hTrieSequence[client]);
+	
+	// Clear sound flags
+	for (new i = 0; i < 14; i++)
+	{
+		HasSoundAt[client][i] = false;
+	}
+	StopSounds[client] = false;
 	
 	for (new i = 0; i < Type_Max; i++)
 	{
@@ -1496,7 +1409,16 @@ public OnPostThinkPost_Old(client)
 			iCycle[client] = 0;
 			next_cycle[client] = 0.0;
 			
+			ClearTrie(g_hTrieSounds[client][0]);
+			ClearTrie(g_hTrieSounds[client][1]);
 			ClearTrie(g_hTrieSequence[client]);
+			
+			// Clear sound flags
+			for (new i = 0; i < 14; i++)
+			{
+				HasSoundAt[client][i] = false;
+			}
+			StopSounds[client] = false;
 			
 			NextSeq[client] = 0.0;
 			
@@ -1541,6 +1463,48 @@ public OnPostThinkPost_Old(client)
 					static String:local_buffer[PLATFORM_MAX_PATH];
 					IntToString(Sequence, local_buffer, sizeof(local_buffer));
 					GetTrieValue(g_hTrieSequence[client], local_buffer, Sequence);	// Sequence mapper
+					
+					// Sound handling
+					if (HasSoundAt[client][Sequence] || StopSounds[client])
+					{
+						if (Cycle < OldCycle[client])
+						{
+							if (g_bDev[client])
+							{
+								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+							}
+							iCycle[client] = 0;
+							next_cycle[client] = game_time + 0.05;
+						}
+						
+						// Check if cycle changed and play sound
+						static iOldCycle[MAXPLAYERS+1];
+						if (iOldCycle[client] != iCycle[client])
+						{
+							iOldCycle[client] = iCycle[client];
+							decl String:sBuf[12];
+							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
+							{
+								decl any:sInfo[4];
+								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
+										local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								}
+								if (sInfo[0])
+								{
+									EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+								}
+								else
+								{
+									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3], 0.0);
+								}
+							}
+						}
+					}
+					
 					if (Cycle < OldCycle[client] && Sequence == OldSequence[client])
 					{
 						CSViewModel_SetSequence(ClientVM2[client], 0);
@@ -1619,7 +1583,16 @@ public OnPostThinkPost(client)
 			iCycle[client] = 0;
 			next_cycle[client] = 0.0;
 			
+			ClearTrie(g_hTrieSounds[client][0]);
+			ClearTrie(g_hTrieSounds[client][1]);
 			ClearTrie(g_hTrieSequence[client]);
+			
+			// Clear sound flags
+			for (new i = 0; i < 14; i++)
+			{
+				HasSoundAt[client][i] = false;
+			}
+			StopSounds[client] = false;
 			
 			NextSeq[client] = 0.0;
 			
@@ -1660,6 +1633,38 @@ public OnPostThinkPost(client)
 			{
 				static String:local_buffer[PLATFORM_MAX_PATH];
 				IntToString(Sequence, local_buffer, sizeof(local_buffer));
+				
+				// Sound handling
+				if (HasSoundAt[client][Sequence] || StopSounds[client])
+				{
+					// Check if cycle changed and play sound
+					static iOldCycle[MAXPLAYERS+1];
+					if (iOldCycle[client] != iCycle[client])
+					{
+						iOldCycle[client] = iCycle[client];
+						decl String:sBuf[12];
+						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
+						{
+							decl any:sInfo[4];
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+							if (g_bDev[client])
+							{
+								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
+									local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+							}
+							if (sInfo[0])
+							{
+								EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							}
+							else
+							{
+								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3], 0.0);
+							}
+						}
+					}
+				}
+				
 				if (OldSequence[client] != Sequence && GetTrieValue(g_hTrieSequence[client], local_buffer, Sequence))	// Sequence mapper
 				{
 					CSViewModel_SetSequence(ClientVM[client], Sequence);
@@ -1822,7 +1827,17 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 {
 	if (Engine_Version == GAME_CSS_34 || (Engine_Version == GAME_CSS && bCvar_OldStyleModelChange))
 	{
+		// Clear sound and sequence data
+		ClearTrie(g_hTrieSounds[client][0]);
+		ClearTrie(g_hTrieSounds[client][1]);
 		ClearTrie(g_hTrieSequence[client]);
+		
+		// Clear sound flags
+		for (new i = 0; i < 14; i++)
+		{
+			HasSoundAt[client][i] = false;
+		}
+		StopSounds[client] = false;
 		
 		iCycle[client] = 0;
 		next_cycle[client] = 0.0;
@@ -2072,7 +2087,17 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		return result;
 	}
 	
+	// Clear sound and sequence data
+	ClearTrie(g_hTrieSounds[client][0]);
+	ClearTrie(g_hTrieSounds[client][1]);
 	ClearTrie(g_hTrieSequence[client]);
+	
+	// Clear sound flags
+	for (new i = 0; i < 14; i++)
+	{
+		HasSoundAt[client][i] = false;
+	}
+	StopSounds[client] = false;
 	
 	iCycle[client] = 0;
 	next_cycle[client] = 0.0;
@@ -2242,6 +2267,35 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 							}
 							while (KvGotoNextKey(hKv, false));
 							KvGoBack(hKv);
+						}
+						KvGoBack(hKv);
+					}
+					
+					// Load sounds from the Sounds section
+					if (KvJumpToKey(hKv, "Sounds"))
+					{
+						StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", 0);
+						if (KvGotoFirstSubKey(hKv))
+						{
+							decl String:map[128];
+							do
+							{
+								KvGetSectionName(hKv, buffer, sizeof(buffer));
+								if (buffer[0] && IsSoundFile(buffer))
+								{
+									new cached_sequence = KvGetNum(hKv, "sequence", 0);
+									FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
+									SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+									
+									decl any:sInfo[4];
+									sInfo[0] = KvGetNum(hKv, "individual", 0);
+									sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
+									sInfo[2] = KvGetNum(hKv, "level", 75);
+									sInfo[3] = KvGetNum(hKv, "pitch", 100);
+									SetTrieArray(g_hTrieSounds[client][1], map, sInfo, 4, true);
+									HasSoundAt[client][cached_sequence] = true;
+								}
+							} while (KvGotoNextKey(hKv));
 						}
 						KvGoBack(hKv);
 					}
@@ -3341,17 +3395,7 @@ GetPrecachedModelOfIndex(index, String:buffer[], maxlength)
 	ReadStringTable(g_iTable, index, buffer, maxlength);
 }
 
-stock FakePrecacheSound(const String:szPath[])
-{
-	static hTable = INVALID_STRING_TABLE;
 
-	if (hTable == INVALID_STRING_TABLE)
-	{
-		hTable = FindStringTable("soundprecache");
-	}
-	
-	AddToStringTable(hTable, szPath);
-}
 
 stock AddToDownloadsTable(String:path[], bool:recursive=true)
 {

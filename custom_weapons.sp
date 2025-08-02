@@ -1462,6 +1462,12 @@ public OnPostThinkPost_Old(client)
 							}
 						}
 					}
+					// If no custom sounds defined and not stopping sounds, allow original sounds to play
+					else if (IsCustom[client])
+					{
+						// Allow original weapon sounds to play by not blocking them
+						// The NormalSoundHook will handle this
+					}
 				}
 				case Plugin_Changed :
 				{
@@ -1638,6 +1644,12 @@ public OnPostThinkPost(client)
 							}
 						}
 					}
+				}
+				// If no custom sounds defined and not stopping sounds, allow original sounds to play
+				else if (IsCustom[client])
+				{
+					// Allow original weapon sounds to play by not blocking them
+					// The NormalSoundHook will handle this
 				}
 			}
 			case Plugin_Changed :
@@ -3401,46 +3413,27 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 {
 	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == 1 || channel == 3) && volume > 0)
 	{
-		// Check if we have custom sounds defined for this weapon
-		new WeaponIndex = CSPlayer_GetActiveWeapon(entity);
-		if (WeaponIndex > 0)
+		// Check if we have any custom sounds defined for this weapon
+		new bool:hasCustomSounds = false;
+		for (new i = 0; i < 14; i++)
 		{
-			decl String:ClassName[32];
-			GetEdictClassname(WeaponIndex, ClassName, sizeof(ClassName));
-			
-			new start_index = 0;
-			if (!StrContains(ClassName, "weapon_", false))
+			if (HasSoundAt[entity][i])
 			{
-				start_index = 7;
-			}
-			
-			// Check if we have any custom sounds defined for this weapon
-			new bool:hasCustomSounds = false;
-			for (new i = 0; i < 14; i++)
-			{
-				if (HasSoundAt[entity][i])
-				{
-					hasCustomSounds = true;
-					break;
-				}
-			}
-			
-			// If we have custom sounds defined, block original sounds
-			if (hasCustomSounds)
-			{
-				channel = 0;
-				return Plugin_Changed;
-			}
-			// If no custom sounds defined, allow original sounds to play
-			else
-			{
-				return Plugin_Continue;
+				hasCustomSounds = true;
+				break;
 			}
 		}
-		else
+		
+		// If we have custom sounds defined, block original sounds
+		if (hasCustomSounds)
 		{
 			channel = 0;
 			return Plugin_Changed;
+		}
+		// If no custom sounds defined, allow original sounds to play
+		else
+		{
+			return Plugin_Continue;
 		}
 	}
 	return Plugin_Continue;

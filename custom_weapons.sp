@@ -1419,40 +1419,37 @@ public OnPostThinkPost_Old(client)
 					
 					if (HasSoundAt[client][Sequence] || StopSounds[client])
 					{
-						if (HasCustomSounds(client))
+						if (!IsFakeClient(client))
 						{
-							if (!IsFakeClient(client))
+							EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+						}
+						if (Cycle < OldCycle[client])
+						{
+							if (g_bDev[client])
 							{
-								EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-								EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
 							}
-							if (Cycle < OldCycle[client])
+							iCycle[client] = 0;
+							next_cycle[client] = game_time + 0.05;
+						}
+						decl String:sBuf[12];
+						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
+						{
+							decl any:sInfo[4];
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+							if (g_bDev[client])
 							{
-								if (g_bDev[client])
-								{
-									PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
-								}
-								iCycle[client] = 0;
-								next_cycle[client] = game_time + 0.05;
+								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
 							}
-							decl String:sBuf[12];
-							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
-							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
+							if (sInfo[0])
 							{
-								decl any:sInfo[4];
-								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
-								if (g_bDev[client])
-								{
-									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
-								}
-								if (sInfo[0])
-								{
-									EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-								}
-								else
-								{
-									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
-								}
+								EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							}
+							else
+							{
+								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
 							}
 						}
 					}
@@ -1585,44 +1582,41 @@ public OnPostThinkPost(client)
 				
 				if (HasSoundAt[client][Sequence] || StopSounds[client])
 				{
-					if (HasCustomSounds(client))
+					if (!IsFakeClient(client))
 					{
-						if (!IsFakeClient(client))
+						EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+						EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+					}
+					if (Cycle < OldCycle[client])
+					{
+						if (g_bDev[client])
 						{
-							EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-							EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
 						}
-						if (Cycle < OldCycle[client])
+						iCycle[client] = 0;
+						iOldCycle[client] = -1;
+						next_cycle[client] = game_time + 0.05;
+					}
+					if (iOldCycle[client] != iCycle[client])
+					{
+						iOldCycle[client] = iCycle[client];
+						decl String:sBuf[12];
+						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
 						{
+							decl any:sInfo[4];
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
 							if (g_bDev[client])
 							{
-								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
 							}
-							iCycle[client] = 0;
-							iOldCycle[client] = -1;
-							next_cycle[client] = game_time + 0.05;
-						}
-						if (iOldCycle[client] != iCycle[client])
-						{
-							iOldCycle[client] = iCycle[client];
-							decl String:sBuf[12];
-							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
-							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
+							if (sInfo[0])
 							{
-								decl any:sInfo[4];
-								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
-								if (g_bDev[client])
-								{
-									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
-								}
-								if (sInfo[0])
-								{
-									EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-								}
-								else
-								{
-									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
-								}
+								EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							}
+							else
+							{
+								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
 							}
 						}
 					}
@@ -1984,14 +1978,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								while (KvGotoNextKey(hKv, true));
 							}
 						}
-						else
-						{
-							// Enable original game sounds for all sequences when no Sounds section is present
-							for (new i = 0; i < 14; i++)
-							{
-								HasSoundAt[client][i] = true;
-							}
-						}
+
 						
 						new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
 						
@@ -2243,14 +2230,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 							while (KvGotoNextKey(hKv, true));
 						}
 					}
-					else
-					{
-						// Enable original game sounds for all sequences when no Sounds section is present
-						for (new i = 0; i < 14; i++)
-						{
-							HasSoundAt[client][i] = true;
-						}
-					}
+
 					
 					new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
 					
@@ -3397,33 +3377,14 @@ AddInFrontOf(const Float:vecOrigin[3], const Float:vecAngle[3], Float:units, Flo
 	return 0;
 }
 
-bool:HasCustomSounds(client)
-{
-	decl String:key[12];
-	for (new i = 0; i < 14; i++)
-	{
-		for (new j = 0; j < 10; j++) // Check first 10 cycles
-		{
-			FormatEx(key, sizeof(key), "%d_%d", i, j);
-			if (GetTrieString(g_hTrieSounds[client][0], key, key, sizeof(key), 0))
-			{
-				return true;
-			}
-		}
-	}
-	return false;
-}
+
 
 public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &entity, &channel, &Float:volume, &level, &pitch, &flags)
 {
 	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == 1 || channel == 3) && volume > 0)
 	{
-		// Only block sounds if we have custom sounds defined
-		if (HasCustomSounds(entity))
-		{
-			channel = 0;
-			return Plugin_Changed;
-		}
+		channel = 0;
+		return Plugin_Changed;
 	}
 	return Plugin_Continue;
 }
@@ -3434,7 +3395,7 @@ public Action:CSS_Hook_ShotgunShot(const String:te_name[], const Players[], numC
 	if (IsCustom[client])
 	{
 		new Sequence = CSViewModel_GetSequence(ClientVM[client]);
-		if (HasSoundAt[client][Sequence] && HasCustomSounds(client))
+		if (HasSoundAt[client][Sequence])
 		{
 			if (g_bMuzzleFlash[client])
 			{

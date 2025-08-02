@@ -9,18 +9,6 @@
 
 #define PLUGIN_VERSION 	"1.1.27"
 
-// Sound types
-enum SoundType {
-    Sound_Fire = 0,
-    Sound_ClipOut,
-    Sound_ClipIn,
-    Sound_Last
-};
-
-// Arrays to store sound paths for each weapon
-new String:g_szWeaponSounds[2048][Sound_Last][PLATFORM_MAX_PATH];
-new g_iWeaponSoundCount = 0;
-
 #define GAME_UNDEFINED 0
 #define GAME_CSS_34 1
 #define GAME_CSS 2
@@ -161,156 +149,6 @@ GetCSGame()
 	return GAME_UNDEFINED;
 }
 
-ParseWeaponSounds()
-{
-    decl String:path[PLATFORM_MAX_PATH];
-    BuildPath(Path_SM, path, sizeof(path), "configs/custom_weapons.txt");
-    
-    new Handle:kv = CreateKeyValues("Weapons");
-    if (!FileToKeyValues(kv, path))
-    {
-        CloseHandle(kv);
-        return;
-    }
-    
-    if (KvGotoFirstSubKey(kv))
-    {
-        decl String:weapon[64], String:skin[64];
-        
-        do
-        {
-            KvGetSectionName(kv, weapon, sizeof(weapon));
-            
-            if (KvGotoFirstSubKey(kv))
-            {
-                do
-                {
-                    KvGetSectionName(kv, skin, sizeof(skin));
-                    
-                    if (KvJumpToKey(kv, "Sounds"))
-                    {
-                        new soundIndex = g_iWeaponSoundCount++;
-                        
-                        // Load fire sound
-                        KvGetString(kv, "fire", g_szWeaponSounds[soundIndex][Sound_Fire], PLATFORM_MAX_PATH);
-                        
-                        // Load clip out sound
-                        KvGetString(kv, "clipout", g_szWeaponSounds[soundIndex][Sound_ClipOut], PLATFORM_MAX_PATH);
-                        
-                        // Load clip in sound
-                        KvGetString(kv, "clipin", g_szWeaponSounds[soundIndex][Sound_ClipIn], PLATFORM_MAX_PATH);
-                        
-                        // Precache sounds if they exist
-                        if (g_szWeaponSounds[soundIndex][Sound_Fire][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_Fire]);
-                        }
-                        if (g_szWeaponSounds[soundIndex][Sound_ClipOut][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_ClipOut]);
-                        }
-                        if (g_szWeaponSounds[soundIndex][Sound_ClipIn][0] != '\0')
-                        {
-                            FakePrecacheSound(g_szWeaponSounds[soundIndex][Sound_ClipIn]);
-                        }
-                        
-                        KvGoBack(kv);
-                    }
-                } while (KvGotoNextKey(kv));
-                KvGoBack(kv);
-            }
-        } while (KvGotoNextKey(kv));
-    }
-    
-    CloseHandle(kv);
-}
-
-PlayWeaponSound(client, const String:weapon[], SoundType:soundType)
-{
-    if (!IsClientInGame(client) || !IsPlayerAlive(client))
-        return;
-    
-    decl String:weaponName[64];
-    strcopy(weaponName, sizeof(weaponName), weapon);
-    
-    // Remove 'weapon_' prefix if it exists
-    if (StrContains(weaponName, "weapon_") == 0)
-        strcopy(weaponName, sizeof(weaponName), weaponName[7]);
-    
-    // Find the weapon in our sound array
-    for (new i = 0; i < g_iWeaponSoundCount; i++)
-    {
-        if (StrEqual(weaponName, g_szWeaponSounds[i][soundType], false))
-        {
-            if (g_szWeaponSounds[i][soundType][0] != '\0')
-            {
-                decl String:soundPath[PLATFORM_MAX_PATH];
-                Format(soundPath, sizeof(soundPath), "sound/%s", g_szWeaponSounds[i][soundType]);
-                EmitSoundToAll(soundPath, client, SNDCHAN_WEAPON, SNDLEVEL_NORMAL, SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-            }
-            break;
-        }
-    }
-}
-
-public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroadcast)
-{
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Continue;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Continue;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    PlayWeaponSound(client, weaponName, Sound_Fire);
-    
-    return Plugin_Continue;
-}
-
-public Action:Event_WeaponReload(Handle:event, const String:name[], bool:dontBroadcast)
-{
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Continue;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Continue;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    // Play clip out sound at the start of reload
-    PlayWeaponSound(client, weaponName, Sound_ClipOut);
-    
-    // Play clip in sound after a short delay (adjust timing as needed)
-    CreateTimer(0.5, Timer_PlayClipInSound, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
-    
-    return Plugin_Continue;
-}
-
-public Action:Timer_PlayClipInSound(Handle:timer, any:userid)
-{
-    new client = GetClientOfUserId(userid);
-    if (!client || !IsPlayerAlive(client))
-        return Plugin_Stop;
-    
-    new weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-    if (weapon == -1)
-        return Plugin_Stop;
-    
-    decl String:weaponName[64];
-    GetEdictClassname(weapon, weaponName, sizeof(weaponName));
-    
-    PlayWeaponSound(client, weaponName, Sound_ClipIn);
-    
-    return Plugin_Stop;
-}
-
 public OnPluginStart()
 {
 	Engine_Version = GetCSGame();
@@ -318,21 +156,31 @@ public OnPluginStart()
 	{
 		SetFailState("Game is not supported!");
 	}
-
-	if (Engine_Version == GAME_CSS_34 || Engine_Version == GAME_CSS)
-	{
-		observer_mode = FindSendPropInfo("CBasePlayer", "m_iObserverMode");
-	}
-
-	CreateConVar("sm_custom_weapons_version", PLUGIN_VERSION, "Custom Weapons Version", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-
-	hCvar_Enable = CreateConVar("sm_custom_weapons_enable", "1", "Enable/Disable custom weapons", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	hCvar_AdminFlags = CreateConVar("sm_custom_weapons_admin", "", "Admin flag required to use custom weapons (leave empty to allow all)", FCVAR_NOTIFY);
-	hCvar_WeaponsPath = CreateConVar("sm_custom_weapons_path", "configs/custom_weapons.txt", "Path to custom weapons config file");
-	hCvar_DownloadsPath = CreateConVar("sm_custom_weapons_downloads", "configs/custom_weapons_downloads.txt", "Path to downloads list");
-	hCvar_OldStyleModelChange = CreateConVar("sm_custom_weapons_oldstyle", "0", "Use old style model changing (for CS:S v34 and older)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-
+	
+	CreateConVar("sm_custom_weapons_version", PLUGIN_VERSION, "Custom weapons version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
+	
+	hCvar_Enable = CreateConVar("sm_custom_weapons_enable", "1", "Whether to enable custom weapon models", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_Enable = GetConVarBool(hCvar_Enable);
 	HookConVarChange(hCvar_Enable, OnConVarChange);
+	
+	hCvar_SpawnMenu = CreateConVar("sm_custom_weapons_menu_spawn", "0", "Whether to enable open weapons models menu on spawn", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_SpawnMenu = GetConVarBool(hCvar_SpawnMenu);
+	HookConVarChange(hCvar_SpawnMenu, OnConVarChange);
+	
+	hCvar_ForceSpawnMenu = CreateConVar("sm_custom_weapons_force_menu_spawn", "0", "Forcibly open menu at every spawn", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_ForceSpawnMenu = GetConVarBool(hCvar_ForceSpawnMenu);
+	HookConVarChange(hCvar_ForceSpawnMenu, OnConVarChange);
+	
+	hCvar_DefaultDisabled = CreateConVar("sm_custom_weapons_default_disabled", "1", "Disable model change by default to new players?", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_DefaultDisabled = GetConVarBool(hCvar_DefaultDisabled);
+	HookConVarChange(hCvar_DefaultDisabled, OnConVarChange);
+	
+	hCvar_ForceDisabled = CreateConVar("sm_custom_weapons_force_disabled", "0", "Force disabled model change for players. Enable only from menu", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_ForceDisabled = GetConVarBool(hCvar_ForceDisabled);
+	HookConVarChange(hCvar_ForceDisabled, OnConVarChange);
+	
+	hCvar_MenuCloseNotice = CreateConVar("sm_custom_weapons_menu_close_notice", "1", "Notice a player in chat about the command to open menu again when it's close", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	bCvar_MenuCloseNotice = GetConVarBool(hCvar_MenuCloseNotice);
 	HookConVarChange(hCvar_MenuCloseNotice, OnConVarChange);
 	
 	hCvar_OldStyleModelChange = CreateConVar("sm_custom_weapons_css_old_style_model_change", "0", "CS:S OB Use old style model change method for flip view model support. Not recommended! May reduce server performance", FCVAR_PLUGIN, true, 0.0, true, 1.0);
@@ -785,6 +633,11 @@ CacheModels(Handle:kv)
 						// Store skin index if specified
 						new iSkin = KvGetNum(kv, "skin", 0);
 						KvSetNum(kv, "skin_index", iSkin);
+						// Also store skin in hKv for menu logic
+						if (KvGetNum(kv, "skin", -1) != -1)
+						{
+							KvSetNum(hKv, "skin", KvGetNum(kv, "skin", 0));
+						}
 						KvSetNum(hKv, "flag_bits", ReadFlagString(buffer));
 						
 						KvGetString(kv, "view_model", buffer, sizeof(buffer));
@@ -2854,7 +2707,12 @@ bool:Menu_ShowSkinSelection(client, const String:model[], max_skin)
 	
 	SetGlobalTransTarget(client);
 	
-	// Get base skin from the model configuration
+	// Навигирай до под-секцията на модела в конфиг
+	KvRewind(hKv);
+	if (!KvJumpToKey(hKv, szWeapon[client]) || !KvJumpToKey(hKv, model))
+	{
+		return false;
+	}
 	new base_skin = KvGetNum(hKv, "skin", 0);
 	
 	// Add skin options from base_skin to max_skin
@@ -2880,11 +2738,13 @@ bool:Menu_ShowSkinSelection(client, const String:model[], max_skin)
 	if (!GetMenuItemCount(menu))
 	{
 		CloseHandle(menu);
+		KvRewind(hKv);
 		return false;
 	}
-	
+
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
-	
+
+	KvRewind(hKv);
 	return true;
 }
 
@@ -3341,18 +3201,6 @@ GetPrecachedModelOfIndex(index, String:buffer[], maxlength)
 	ReadStringTable(g_iTable, index, buffer, maxlength);
 }
 
-stock FakePrecacheSound(const String:szPath[])
-{
-	static hTable = INVALID_STRING_TABLE;
-
-	if (hTable == INVALID_STRING_TABLE)
-	{
-		hTable = FindStringTable("soundprecache");
-	}
-	
-	AddToStringTable(hTable, szPath);
-}
-
 stock AddToDownloadsTable(String:path[], bool:recursive=true)
 {
 	if (path[0] == '\0')
@@ -3496,14 +3344,6 @@ stock AddInFrontOf(const Float:vecOrigin[3], const Float:vecAngle[3], Float:unit
 	output[0] = vecView[0] * units + vecOrigin[0];
 	output[1] = vecView[1] * units + vecOrigin[1];
 	output[2] = vecView[2] * units + vecOrigin[2];
-}
-
-stock bool:IsSoundFile(const String:sound[])
-{
-	decl String:buf[4];
-	ZGetExtension(sound, buf, sizeof(buf));
-	
-	return (!strcmp(buf, "mp3", false) || !strcmp(buf, "wav", false));
 }
 
 stock ZGetExtension(const String:path[], String:buffer[], size)

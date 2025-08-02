@@ -33,6 +33,11 @@ enum
 
 new Handle:g_hTrieSequence[MAXPLAYERS+1];
 
+// Добавяне на липсващите звукови променливи
+new Handle:g_hTrieSounds[MAXPLAYERS+1][2];
+new bool:HasSoundAt[MAXPLAYERS+1][14];
+new bool:StopSounds[MAXPLAYERS+1];
+
 new bool:g_bMuzzleFlash[MAXPLAYERS+1],
 	Float:g_fMuzzleScale[MAXPLAYERS+1],
 Float:g_fMuzzlePos[MAXPLAYERS+1][3];
@@ -226,6 +231,10 @@ public OnPluginStart()
 	HookEvent("round_start", OnRoundStart, EventHookMode_PostNoCopy);
 	
 	RegAdminCmd("cw_dev", Command_Dev, ADMFLAG_ROOT);
+	
+	// Добавяне на звукови hooks
+	AddNormalSoundHook(NormalSoundHook);
+	PrecacheSound("resource/warning.wav");
 	
 	g_iTable = FindStringTable("modelprecache");
 	
@@ -477,6 +486,8 @@ public OnConVarChange(Handle:convar, const String:oldValue[], const String:newVa
 
 public OnMapStart()
 {
+	PrecacheSound("resource/warning.wav");
+	
 	if (!g_bShouldLoadReload)
 	{
 		CacheModels(hKv);
@@ -680,6 +691,28 @@ CacheModels(Handle:kv)
 						{
 							KvSetString(kv, "planted_world_model", "");
 						}
+						
+						// Добавяне на звуково обработване
+						if (KvJumpToKey(kv, "Sounds"))
+						{
+							KvSavePosition(kv);
+							if (KvGotoFirstSubKey(kv))
+							{
+								do
+								{
+									KvGetSectionName(kv, buffer, sizeof(buffer));
+									if (buffer[0] && IsSoundFile(buffer))
+									{
+										PrecacheSound(buffer);
+										Format(buffer, sizeof(buffer), "sound/%s", buffer);
+										AddFileToDownloadsTable(buffer);
+									}
+								} 
+								while (KvGotoNextKey(kv));
+								KvGoBack(kv);
+							}
+							KvGoBack(kv);
+						}
 					} while (KvGotoNextKey(kv));
 					
 					KvRewind(kv);
@@ -709,6 +742,16 @@ public OnClientConnected(client)
 	if (g_hTrieSequence[client] == INVALID_HANDLE)
 	{
 		g_hTrieSequence[client] = CreateTrie();
+	}
+	
+	// Добавяне на инициализация за звуковите trie структури
+	if (g_hTrieSounds[client][0] == INVALID_HANDLE)
+	{
+		g_hTrieSounds[client][0] = CreateTrie();
+	}
+	if (g_hTrieSounds[client][1] == INVALID_HANDLE)
+	{
+		g_hTrieSounds[client][1] = CreateTrie();
 	}
 }
 
@@ -820,6 +863,16 @@ public OnClientDisconnect_Post(client)
 	weapon_sequence[client] = INVALID_FUNCTION;
 	
 	ClearTrie(g_hTrieSequence[client]);
+	
+	// Добавяне на почистване на звуковите данни
+	ClearTrie(g_hTrieSounds[client][0]);
+	ClearTrie(g_hTrieSounds[client][1]);
+	
+	for (new i = 0; i < 14; i++)
+	{
+		HasSoundAt[client][i] = false;
+	}
+	StopSounds[client] = false;
 	
 	for (new i = 0; i < Type_Max; i++)
 	{
@@ -1351,6 +1404,16 @@ public OnPostThinkPost_Old(client)
 			
 			ClearTrie(g_hTrieSequence[client]);
 			
+			// Добавяне на почистване на звуковите данни
+			ClearTrie(g_hTrieSounds[client][0]);
+			ClearTrie(g_hTrieSounds[client][1]);
+			
+			for (new i = 0; i < 14; i++)
+			{
+				HasSoundAt[client][i] = false;
+			}
+			StopSounds[client] = false;
+			
 			NextSeq[client] = 0.0;
 			
 			Function_OnWeaponSwitch(hPlugin[client], weapon_switch[client], client, WeaponIndex, ClientVM2[client], OldSequence[client], Sequence);
@@ -1372,8 +1435,7 @@ public OnPostThinkPost_Old(client)
 		OldWeapon[client] = WeaponIndex;
 		return;
 	}
-	else
-	if (IsCustom[client])
+	else if (IsCustom[client])
 	{
 		if (g_bDev[client])
 		{
@@ -1393,17 +1455,61 @@ public OnPostThinkPost_Old(client)
 				{
 					static String:local_buffer[PLATFORM_MAX_PATH];
 					IntToString(Sequence, local_buffer, sizeof(local_buffer));
-					GetTrieValue(g_hTrieSequence[client], local_buffer, Sequence);	// Sequence mapper
-					if (Cycle < OldCycle[client] && Sequence == OldSequence[client])
+					
+					// Добавяне на звукови функционалности
+					if (HasSoundAt[client][Sequence] || StopSounds[client])
 					{
-						CSViewModel_SetSequence(ClientVM2[client], 0);
-						NextSeq[client] = game_time + 0.02;
-					}
-					else if (NextSeq[client] < game_time)
-					{
-						CSViewModel_SetSequence(ClientVM2[client], Sequence);
+						if (!IsFakeClient(client))
+						{
+							EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_WEAPON, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+							EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_ITEM, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+						}
+						
+						if (Cycle < OldCycle[client])
+						{
+							if (g_bDev[client])
+							{
+								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+							}
+							iCycle[client] = 0;
+							next_cycle[client] = game_time + 0.05;
+						}
+						
+						static iOldCycle[MAXPLAYERS+1];
+						if (iOldCycle[client] != iCycle[client])
+						{
+							iOldCycle[client] = iCycle[client];
+							decl String:sBuf[12];
+							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
+							{
+								decl any:sInfo[4];
+								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
+										local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								}
+								if (sInfo[0])
+								{
+									EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+								}
+								else
+								{
+									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+								}
+							}
+						}
 					}
 					
+					if (OldSequence[client] != Sequence && GetTrieValue(g_hTrieSequence[client], local_buffer, Sequence))	// Sequence mapper
+					{
+						CSViewModel_SetSequence(ClientVM[client], Sequence);
+						if (g_bDev[client])
+						{
+							PrintToChat(client, "\x04Sequence mapped (%s -> %d)", local_buffer, Sequence);
+						}
+					}
 				}
 				case Plugin_Changed :
 				{
@@ -1474,6 +1580,16 @@ public OnPostThinkPost(client)
 			
 			ClearTrie(g_hTrieSequence[client]);
 			
+			// Добавяне на почистване на звуковите данни
+			ClearTrie(g_hTrieSounds[client][0]);
+			ClearTrie(g_hTrieSounds[client][1]);
+			
+			for (new i = 0; i < 14; i++)
+			{
+				HasSoundAt[client][i] = false;
+			}
+			StopSounds[client] = false;
+			
 			NextSeq[client] = 0.0;
 			
 			Function_OnWeaponSwitch(hPlugin[client], weapon_switch[client], client, WeaponIndex, ClientVM[client], OldSequence[client], Sequence);
@@ -1504,8 +1620,7 @@ public OnPostThinkPost(client)
 		OldWeapon[client] = WeaponIndex;
 		return;
 	}
-	else
-	if (IsCustom[client])
+	else if (IsCustom[client])
 	{
 		switch (Function_OnWeaponThink(hPlugin[client], weapon_sequence[client], client, WeaponIndex, ClientVM[client], OldSequence[client], Sequence))
 		{
@@ -1513,6 +1628,53 @@ public OnPostThinkPost(client)
 			{
 				static String:local_buffer[PLATFORM_MAX_PATH];
 				IntToString(Sequence, local_buffer, sizeof(local_buffer));
+				
+				// Добавяне на звукови функционалности
+				if (HasSoundAt[client][Sequence] || StopSounds[client])
+				{
+					if (!IsFakeClient(client))
+					{
+						EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_WEAPON, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+						EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_ITEM, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+					}
+					
+					if (Cycle < OldCycle[client])
+					{
+						if (g_bDev[client])
+						{
+							PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+						}
+						iCycle[client] = 0;
+						next_cycle[client] = game_time + 0.05;
+					}
+					
+					static iOldCycle[MAXPLAYERS+1];
+					if (iOldCycle[client] != iCycle[client])
+					{
+						iOldCycle[client] = iCycle[client];
+						decl String:sBuf[12];
+						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
+						{
+							decl any:sInfo[4];
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+							if (g_bDev[client])
+							{
+								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
+									local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+							}
+							if (sInfo[0])
+							{
+								EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+							}
+							else
+							{
+								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+							}
+						}
+					}
+				}
+				
 				if (OldSequence[client] != Sequence && GetTrieValue(g_hTrieSequence[client], local_buffer, Sequence))	// Sequence mapper
 				{
 					CSViewModel_SetSequence(ClientVM[client], Sequence);
@@ -1676,6 +1838,16 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 	if (Engine_Version == GAME_CSS_34 || (Engine_Version == GAME_CSS && bCvar_OldStyleModelChange))
 	{
 		ClearTrie(g_hTrieSequence[client]);
+		
+		// Добавяне на почистване на звуковите данни
+		ClearTrie(g_hTrieSounds[client][0]);
+		ClearTrie(g_hTrieSounds[client][1]);
+		
+		for (new i = 0; i < 14; i++)
+		{
+			HasSoundAt[client][i] = false;
+		}
+		StopSounds[client] = false;
 		
 		iCycle[client] = 0;
 		next_cycle[client] = 0.0;
@@ -1860,6 +2032,38 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 						}
 						new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
 						
+						// Добавяне на звуково обработване
+						if (KvJumpToKey(hKv, "Sounds"))
+						{
+							StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+							if (KvGotoFirstSubKey(hKv))
+							{
+								decl String:map[128];
+								decl String:buffer[PLATFORM_MAX_PATH];
+								do
+								{
+									KvGetSectionName(hKv, buffer, sizeof(buffer));
+									if (buffer[0] && IsSoundFile(buffer))
+									{
+										new cached_sequence = KvGetNum(hKv, "sequence", 0);
+										FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
+										SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+										
+										decl any:sInfo[4];
+										sInfo[0] = KvGetNum(hKv, "individual", 0);
+										sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
+										sInfo[2] = KvGetNum(hKv, "level", 75);
+										sInfo[3] = KvGetNum(hKv, "pitch", 100);
+										SetTrieArray(g_hTrieSounds[client][1], map, sInfo, 4, true);
+										HasSoundAt[client][cached_sequence] = true;
+									}
+								} 
+								while (KvGotoNextKey(hKv));
+								KvGoBack(hKv);
+							}
+							KvGoBack(hKv);
+						}
+						
 						if (IsValidEdict(ClientVM2[client]))
 						{
 							CSViewModel_AddEffects(ClientVM[client], EF_NODRAW);
@@ -1908,6 +2112,16 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 				
 				IsCustom[client] = false;
 				
+				// Добавяне на почистване на звуковите данни
+				ClearTrie(g_hTrieSounds[client][0]);
+				ClearTrie(g_hTrieSounds[client][1]);
+				
+				for (new i = 0; i < 14; i++)
+				{
+					HasSoundAt[client][i] = false;
+				}
+				StopSounds[client] = false;
+				
 				NextSeq[client] = 0.0;
 			}
 			
@@ -1926,6 +2140,16 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 	}
 	
 	ClearTrie(g_hTrieSequence[client]);
+	
+	// Добавяне на почистване на звуковите данни
+	ClearTrie(g_hTrieSounds[client][0]);
+	ClearTrie(g_hTrieSounds[client][1]);
+	
+	for (new i = 0; i < 14; i++)
+	{
+		HasSoundAt[client][i] = false;
+	}
+	StopSounds[client] = false;
 	
 	iCycle[client] = 0;
 	next_cycle[client] = 0.0;
@@ -2100,6 +2324,38 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					}
 					new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
 					
+					// Добавяне на звуково обработване
+					if (KvJumpToKey(hKv, "Sounds"))
+					{
+						StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+						if (KvGotoFirstSubKey(hKv))
+						{
+							decl String:map[128];
+							decl String:buffer[PLATFORM_MAX_PATH];
+							do
+							{
+								KvGetSectionName(hKv, buffer, sizeof(buffer));
+								if (buffer[0] && IsSoundFile(buffer))
+								{
+									new cached_sequence = KvGetNum(hKv, "sequence", 0);
+									FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
+									SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+									
+									decl any:sInfo[4];
+									sInfo[0] = KvGetNum(hKv, "individual", 0);
+									sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
+									sInfo[2] = KvGetNum(hKv, "level", 75);
+									sInfo[3] = KvGetNum(hKv, "pitch", 100);
+									SetTrieArray(g_hTrieSounds[client][1], map, sInfo, 4, true);
+									HasSoundAt[client][cached_sequence] = true;
+								}
+							} 
+							while (KvGotoNextKey(hKv));
+							KvGoBack(hKv);
+						}
+						KvGoBack(hKv);
+					}
+					
 					if (!IsCustom[client])
 					{
 						iPrevIndex[client] = CSViewModel_GetModelIndex(ClientVM[client]);
@@ -2139,6 +2395,16 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		iPrevIndex[client] = 0;
 		
 		IsCustom[client] = false;
+		
+		// Добавяне на почистване на звуковите данни
+		ClearTrie(g_hTrieSounds[client][0]);
+		ClearTrie(g_hTrieSounds[client][1]);
+		
+		for (new i = 0; i < 14; i++)
+		{
+			HasSoundAt[client][i] = false;
+		}
+		StopSounds[client] = false;
 		
 		NextSeq[client] = 0.0;
 	}
@@ -3196,6 +3462,14 @@ bool:IsModelFile(const String:model[])
 	return !strcmp(buf, "mdl", false);
 }
 
+bool:IsSoundFile(const String:sound[])
+{
+	decl String:buf[4];
+	ZGetExtension(sound, buf, sizeof(buf));
+	
+	return (!strcmp(buf, "mp3", false) || !strcmp(buf, "wav", false));
+}
+
 GetPrecachedModelOfIndex(index, String:buffer[], maxlength)
 {
 	ReadStringTable(g_iTable, index, buffer, maxlength);
@@ -3449,4 +3723,13 @@ stock StringToLower(const String:input[], String:output[], size)
 	}
 
 	output[x] = '\0';
+}
+
+public Action:NormalSoundHook(clients[64], &numClients, String:sample[PLATFORM_MAX_PATH], &entity, &channel, &Float:volume, &level, &pitch, &flags)
+{
+	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == SNDCHAN_WEAPON || channel == SNDCHAN_ITEM) && volume > 0.0)
+	{
+		return Plugin_Handled;
+	}
+	return Plugin_Continue;
 }

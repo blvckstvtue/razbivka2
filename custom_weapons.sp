@@ -1417,39 +1417,48 @@ public OnPostThinkPost_Old(client)
 						CSViewModel_SetSequence(ClientVM2[client], Sequence);
 					}
 					
+					// Only process custom sounds if we have them defined or if we want to stop all sounds
 					if (HasSoundAt[client][Sequence] || StopSounds[client])
 					{
-						if (!IsFakeClient(client))
+						if (StopSounds[client])
 						{
-							EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-							EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							// Stop all sounds
+							if (!IsFakeClient(client))
+							{
+								EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+								EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							}
 						}
-						if (Cycle < OldCycle[client])
+						else if (HasSoundAt[client][Sequence])
 						{
-							if (g_bDev[client])
+							// Process custom sounds
+							if (Cycle < OldCycle[client])
 							{
-								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+								}
+								iCycle[client] = 0;
+								next_cycle[client] = game_time + 0.05;
 							}
-							iCycle[client] = 0;
-							next_cycle[client] = game_time + 0.05;
-						}
-						decl String:sBuf[12];
-						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
-						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
-						{
-							decl any:sInfo[4];
-							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
-							if (g_bDev[client])
+							decl String:sBuf[12];
+							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
 							{
-								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
-							}
-							if (sInfo[0])
-							{
-								EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-							}
-							else
-							{
-								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
+								decl any:sInfo[4];
+								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								}
+								if (sInfo[0])
+								{
+									EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+								}
+								else
+								{
+									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
+								}
 							}
 						}
 					}
@@ -1580,43 +1589,52 @@ public OnPostThinkPost(client)
 					}
 				}
 				
+				// Only process custom sounds if we have them defined or if we want to stop all sounds
 				if (HasSoundAt[client][Sequence] || StopSounds[client])
 				{
-					if (!IsFakeClient(client))
+					if (StopSounds[client])
 					{
-						EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-						EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-					}
-					if (Cycle < OldCycle[client])
-					{
-						if (g_bDev[client])
+						// Stop all sounds
+						if (!IsFakeClient(client))
 						{
-							PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
+							EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 						}
-						iCycle[client] = 0;
-						iOldCycle[client] = -1;
-						next_cycle[client] = game_time + 0.05;
 					}
-					if (iOldCycle[client] != iCycle[client])
+					else if (HasSoundAt[client][Sequence])
 					{
-						iOldCycle[client] = iCycle[client];
-						decl String:sBuf[12];
-						FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
-						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
+						// Process custom sounds
+						if (Cycle < OldCycle[client])
 						{
-							decl any:sInfo[4];
-							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
 							if (g_bDev[client])
 							{
-								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								PrintToChat(client, "Stopped at cycle %d sequence %d", iCycle[client], OldSequence[client]);
 							}
-							if (sInfo[0])
+							iCycle[client] = 0;
+							iOldCycle[client] = -1;
+							next_cycle[client] = game_time + 0.05;
+						}
+						if (iOldCycle[client] != iCycle[client])
+						{
+							iOldCycle[client] = iCycle[client];
+							decl String:sBuf[12];
+							FormatEx(sBuf, sizeof(sBuf), "%d_%d", Sequence, iCycle[client]);
+							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
 							{
-								EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
-							}
-							else
-							{
-								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
+								decl any:sInfo[4];
+								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								}
+								if (sInfo[0])
+								{
+									EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+								}
+								else
+								{
+									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
+								}
 							}
 						}
 					}
@@ -3383,8 +3401,47 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 {
 	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == 1 || channel == 3) && volume > 0)
 	{
-		channel = 0;
-		return Plugin_Changed;
+		// Check if we have custom sounds defined for this weapon
+		new WeaponIndex = CSPlayer_GetActiveWeapon(entity);
+		if (WeaponIndex > 0)
+		{
+			decl String:ClassName[32];
+			GetEdictClassname(WeaponIndex, ClassName, sizeof(ClassName));
+			
+			new start_index = 0;
+			if (!StrContains(ClassName, "weapon_", false))
+			{
+				start_index = 7;
+			}
+			
+			// Check if we have any custom sounds defined for this weapon
+			new bool:hasCustomSounds = false;
+			for (new i = 0; i < 14; i++)
+			{
+				if (HasSoundAt[entity][i])
+				{
+					hasCustomSounds = true;
+					break;
+				}
+			}
+			
+			// If we have custom sounds defined, block original sounds
+			if (hasCustomSounds)
+			{
+				channel = 0;
+				return Plugin_Changed;
+			}
+			// If no custom sounds defined, allow original sounds to play
+			else
+			{
+				return Plugin_Continue;
+			}
+		}
+		else
+		{
+			channel = 0;
+			return Plugin_Changed;
+		}
 	}
 	return Plugin_Continue;
 }

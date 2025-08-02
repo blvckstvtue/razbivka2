@@ -93,7 +93,7 @@ new iCycle[MAXPLAYERS+1], Float:next_cycle[MAXPLAYERS+1];
 public Plugin:myinfo =
 {
 	name = "[CS] Custom Weapons",
-	author = "TRASHLORD",
+	author = "FrozDark",
 	description = "Custom weapon models - server side",
 	version = PLUGIN_VERSION,
 	url = "http://www.hlmod.ru/"
@@ -630,14 +630,6 @@ CacheModels(Handle:kv)
 						
 						KvGetString(hKv, "flags", buffer, sizeof(buffer));
 						StringToLower(buffer, buffer, sizeof(buffer));
-						// Store skin index if specified
-						new iSkin = KvGetNum(kv, "skin", 0);
-						KvSetNum(kv, "skin_index", iSkin);
-						// Also store skin in hKv for menu logic
-						if (KvGetNum(kv, "skin", -1) != -1)
-						{
-							KvSetNum(hKv, "skin", KvGetNum(kv, "skin", 0));
-						}
 						KvSetNum(hKv, "flag_bits", ReadFlagString(buffer));
 						
 						KvGetString(kv, "view_model", buffer, sizeof(buffer));
@@ -882,45 +874,6 @@ bool:GetCookieValue(client, const String:weapon[], &Handle:cookie, String:value[
 		GetClientCookie(client, cookie, value, size);
 		return true;
 	}
-	return false;
-}
-
-bool:ParseCookieValue(const String:cookie_value[], String:model_name[], model_size, &skin_index)
-{
-	skin_index = 0;
-	
-	// Check if this is a skin selection (format: modelname_skin_X)
-	new pos = FindCharInString(cookie_value, '_', true);
-	if (pos != -1)
-	{
-		// Check if it contains "_skin_" pattern
-		decl String:temp[64];
-		strcopy(temp, sizeof(temp), cookie_value);
-		temp[pos] = '\0';
-		
-		// Look for "_skin_" pattern
-		new skin_pattern_pos = FindCharInString(temp, '_', true);
-		if (skin_pattern_pos != -1)
-		{
-			decl String:pattern[8];
-			strcopy(pattern, sizeof(pattern), temp[skin_pattern_pos + 1]);
-			if (StrEqual(pattern, "skin"))
-			{
-				// Extract model name (everything before "_skin_")
-				strcopy(model_name, model_size, temp);
-				model_name[skin_pattern_pos] = '\0';
-				
-				// Extract skin number (everything after "_skin_")
-				decl String:skin_str[8];
-				strcopy(skin_str, sizeof(skin_str), cookie_value[pos + 1]);
-				skin_index = StringToInt(skin_str);
-				return true;
-			}
-		}
-	}
-	
-	// Regular model selection without skin
-	strcopy(model_name, model_size, cookie_value);
 	return false;
 }
 
@@ -1692,7 +1645,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		}
 		
 		new world_model;
-		new skin_index = 0;
 		
 		Function_OnWeaponSwitch(hPlugin[client], weapon_switch[client], client, WeaponIndex, ClientVM2[client], OldSequence[client], Sequence);
 		
@@ -1722,7 +1674,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 			else 
 			{
 				new index = KvGetNum(hRegKv, "view_model_index");
-				skin_index = KvGetNum(hRegKv, "skin_index", 0);
 				
 				if (IsValidEdict(ClientVM2[client]))
 				{
@@ -1734,11 +1685,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					if (index != 0)
 					{
 						CSViewModel_SetModelIndex(ClientVM2[client], index);
-						if (skin_index)
-						{
-							SetEntProp(ClientVM2[client], Prop_Send, "m_nSkin", skin_index);
-							SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-						}
 						custom_change = true;
 					}
 					
@@ -1778,17 +1724,12 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 				{
 					new index;
 					
-					// Parse cookie value for skin selection
-					decl String:model_name[64];
-					new selected_skin = 0;
-					new bool:has_skin = ParseCookieValue(sValue, model_name, sizeof(model_name), selected_skin);
-					
 					decl Float:vTemp[3];
 					KvGetVector(hKv, "muzzle_move", vTemp);
 					g_fMuzzlePos[client] = vTemp;
 					
 					new bool:jumped = false;
-					if (!model_name[0] || !(jumped = KvJumpToKey(hKv, model_name)) || ((bits = KvGetNum(hKv, "flag_bits")) > 0 && !(iClFlags & bits)))
+					if (!sValue[0] || !(jumped = KvJumpToKey(hKv, sValue)) || ((bits = KvGetNum(hKv, "flag_bits")) > 0 && !(iClFlags & bits)))
 					{
 						if (jumped)
 						{
@@ -1802,8 +1743,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								if (!bits || iClFlags & bits)
 								{
 									index = KvGetNum(hKv, "view_model_index");
-									// Use selected skin if available, otherwise use default
-									skin_index = has_skin ? selected_skin : KvGetNum(hKv, "skin_index", 0);
 									world_model = KvGetNum(hKv, "world_model_index");
 									
 									g_bMuzzleFlash[client] = bool:KvGetNum(hKv, "muzzle_flash", false);
@@ -1828,8 +1767,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					else
 					{
 						index = KvGetNum(hKv, "view_model_index");
-						// Use selected skin if available, otherwise use default
-						skin_index = has_skin ? selected_skin : KvGetNum(hKv, "skin_index", 0);
 						world_model = KvGetNum(hKv, "world_model_index");
 						
 						g_bMuzzleFlash[client] = bool:KvGetNum(hKv, "muzzle_flash", false);
@@ -1866,11 +1803,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 							
 							CSViewModel_RemoveEffects(ClientVM2[client], EF_NODRAW);
 							CSViewModel_SetModelIndex(ClientVM2[client], index);
-							if (skin_index)
-							{
-								SetEntProp(ClientVM2[client], Prop_Send, "m_nSkin", skin_index);
-								SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-							}
 							
 							if (b_flip_model)
 							{
@@ -1914,10 +1846,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 			if (world_model > 0)
 			{
 				SetEntProp(WeaponIndex, Prop_Send, "m_iWorldModelIndex", world_model);
-				if (skin_index)
-				{
-					SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-				}
 			}
 			iDroppedModel[WeaponIndex] = world_model;
 		}
@@ -1942,7 +1870,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 	}
 	
 	new world_model, dropped_model;
-	new skin_index = 0;
 	
 	Function_OnWeaponSwitch(hPlugin[client], weapon_switch[client], client, WeaponIndex, ClientVM[client], OldSequence[client], Sequence);
 	
@@ -1972,7 +1899,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		else 
 		{
 			new index = KvGetNum(hRegKv, "view_model_index");
-			skin_index = KvGetNum(hRegKv, "skin_index", 0);
 			
 			if (!IsCustom[client])
 			{
@@ -1984,12 +1910,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 			if (!custom_change)
 			{
 				CSViewModel_SetModelIndex(ClientVM[client], index);
-				// Apply skin if defined
-				if (skin_index)
-				{
-					SetEntProp(ClientVM[client], Prop_Send, "m_nSkin", skin_index);
-					SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-				}
 			}
 			
 			IsCustom[client] = custom_change;
@@ -2016,17 +1936,12 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 			{
 				new index;
 				
-				// Parse cookie value for skin selection
-				decl String:model_name[64];
-				new selected_skin = 0;
-				new bool:has_skin = ParseCookieValue(sValue, model_name, sizeof(model_name), selected_skin);
-				
 				decl Float:vTemp[3];
 				KvGetVector(hKv, "muzzle_move", vTemp);
 				g_fMuzzlePos[client] = vTemp;
 				
 				new bool:jumped = false;
-				if (!model_name[0] || !(jumped = KvJumpToKey(hKv, model_name)) || ((bits = KvGetNum(hKv, "flag_bits")) > 0 && !(iClFlags & bits)))
+				if (!sValue[0] || !(jumped = KvJumpToKey(hKv, sValue)) || ((bits = KvGetNum(hKv, "flag_bits")) > 0 && !(iClFlags & bits)))
 				{
 					if (jumped)
 					{
@@ -2040,8 +1955,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 							if (!bits || iClFlags & bits)
 							{
 								index = KvGetNum(hKv, "view_model_index");
-								// Use selected skin if available, otherwise use default
-								skin_index = has_skin ? selected_skin : KvGetNum(hKv, "skin_index", 0);
 								world_model = KvGetNum(hKv, "world_model_index");
 								dropped_model = KvGetNum(hKv, "drop_model_index");
 								
@@ -2067,8 +1980,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 				else
 				{
 					index = KvGetNum(hKv, "view_model_index");
-					// Use selected skin if available, otherwise use default
-					skin_index = has_skin ? selected_skin : KvGetNum(hKv, "skin_index", 0);
 					world_model = KvGetNum(hKv, "world_model_index");
 					dropped_model = KvGetNum(hKv, "drop_model_index");
 					
@@ -2114,12 +2025,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					}
 					SetEntProp(WeaponIndex, Prop_Send, "m_nModelIndex", 0);
 					CSViewModel_SetModelIndex(ClientVM[client], index);
-					// Apply skin if defined
-					if (skin_index)
-					{
-						SetEntProp(ClientVM[client], Prop_Send, "m_nSkin", skin_index);
-						SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-					}
 					IsCustom[client] = true;
 					
 					result = true;
@@ -2149,10 +2054,6 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		if (world_model > 0)
 		{
 			SetEntProp(WeaponIndex, Prop_Send, "m_iWorldModelIndex", world_model);
-			if (skin_index)
-			{
-				SetEntProp(WeaponIndex, Prop_Send, "m_nSkin", skin_index);
-			}
 		}
 	}
 	else
@@ -2449,7 +2350,6 @@ public CategoryMenu_Handler(Handle:menu, MenuAction:action, param1, param2)
 
 new String:szWeapon[MAXPLAYERS+1][32];
 new String:sTitle[MAXPLAYERS+1][128];
-new String:szSelectedModel[MAXPLAYERS+1][64];
 bool:Menu_ShowWeapon(client, const String:weapon[], const String:title[])
 {
 	new Handle:menu = CreateMenu(WeaponMenu_Handler);
@@ -2498,53 +2398,22 @@ bool:Menu_ShowWeapon(client, const String:weapon[], const String:title[])
 			}
 			
 			new bits = KvGetNum(hKv, "flag_bits");
+			
 			new bool:has_access = bool:(!bits || iClFlags & bits);
 			
-			// Check if this model has multiple skins
-			new max_skin = KvGetNum(hKv, "max_skin", 0);
-			if (max_skin > 0)
+			if (!has_access)
 			{
-				// Get base skin for proper range display
-				new base_skin = KvGetNum(hKv, "skin", 0);
-				// This model has multiple skins, show it as a submenu
-				Format(buffer, sizeof(buffer), "%s (Skins: %d-%d)", buffer, base_skin, max_skin);
-				
-				// Check if this model is currently selected
-				decl String:model_name[64];
-				new selected_skin = 0;
-				new bool:has_skin = ParseCookieValue(sUserValue, model_name, sizeof(model_name), selected_skin);
-				
-				if (has_skin && StrEqual(section, model_name))
-				{
-					Format(buffer, sizeof(buffer), "%s (Skin %d) [+]", buffer, selected_skin);
-					AddMenuItem(menu, section, buffer, has_access ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-					continue;
-				}
-				
-				if (!has_access)
-				{
-					Format(buffer, sizeof(buffer), "%s (%t)", buffer, "Menu_NoAccess");
-				}
-				
-				AddMenuItem(menu, section, buffer, has_access ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+				Format(buffer, sizeof(buffer), "%s (%t)", buffer, "Menu_NoAccess");
 			}
-			else
+			else if (StrEqual(section, sUserValue))
 			{
-				// Single skin model
-				if (!has_access)
-				{
-					Format(buffer, sizeof(buffer), "%s (%t)", buffer, "Menu_NoAccess");
-				}
-				else if (StrEqual(section, sUserValue))
-				{
-					StrCat(buffer, sizeof(buffer), " [+]");
-					AddMenuItem(menu, section, buffer, ITEMDRAW_DISABLED);
-					
-					continue;
-				}
+				StrCat(buffer, sizeof(buffer), " [+]");
+				AddMenuItem(menu, section, buffer, ITEMDRAW_DISABLED);
 				
-				AddMenuItem(menu, section, buffer, has_access ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+				continue;
 			}
+			
+			AddMenuItem(menu, section, buffer, has_access ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 		}
 		while (KvGotoNextKey(hKv));
 	}
@@ -2602,28 +2471,6 @@ public WeaponMenu_Handler(Handle:menu, MenuAction:action, param1, param2)
 			decl String:sInfo[64];
 			GetMenuItem(menu, param2, sInfo, sizeof(sInfo));
 			
-			// Check if this is a multi-skin model
-			decl String:model_name[64];
-			new selected_skin = 0;
-			new bool:has_skin = ParseCookieValue(sInfo, model_name, sizeof(model_name), selected_skin);
-			
-			if (KvJumpToKey(hKv, szWeapon[param1]) && KvJumpToKey(hKv, model_name))
-			{
-				new max_skin = KvGetNum(hKv, "max_skin", 0);
-				KvRewind(hKv);
-				
-				if (max_skin > 0)
-				{
-					// Show skin selection menu
-					if (!Menu_ShowSkinSelection(param1, model_name, max_skin))
-					{
-						Menu_ShowWeapon(param1, szWeapon[param1], sTitle[param1]);
-					}
-					return;
-				}
-			}
-			
-			// Single skin model or default selection
 			decl Handle:hCookie;
 			if (GetTrieValue(hTrie_Cookies, szWeapon[param1], hCookie))
 			{
@@ -2688,182 +2535,6 @@ bool:CheckWeapon(client, weapon)
 		}
 	}
 	return false;
-}
-
-bool:Menu_ShowSkinSelection(client, const String:model[], max_skin)
-{
-	new Handle:menu = CreateMenu(SkinSelectionMenu_Handler);
-	
-	decl String:buffer[128];
-	FormatEx(buffer, sizeof(buffer), "Select Skin for %s\n ", model);
-	SetMenuTitle(menu, buffer);
-	SetMenuExitButton(menu, true);
-	SetMenuExitBackButton(menu, true);
-	
-	strcopy(szSelectedModel[client], sizeof(szSelectedModel[]), model);
-	
-	decl String:sUserValue[64], Handle:hCookie;
-	GetCookieValue(client, szWeapon[client], hCookie, sUserValue, sizeof(sUserValue));
-	
-	SetGlobalTransTarget(client);
-	
-	// Навигирай до под-секцията на модела в конфиг
-	KvRewind(hKv);
-	if (!KvJumpToKey(hKv, szWeapon[client]) || !KvJumpToKey(hKv, model))
-	{
-		return false;
-	}
-	new base_skin = KvGetNum(hKv, "skin", 0);
-	
-	// Add skin options from base_skin to max_skin
-	for (new skin = base_skin; skin <= max_skin; skin++)
-	{
-		FormatEx(buffer, sizeof(buffer), "Skin %d", skin);
-		
-		// Check if this skin is currently selected
-		decl String:current_selection[64];
-		FormatEx(current_selection, sizeof(current_selection), "%s_skin_%d", model, skin);
-		
-		if (StrEqual(sUserValue, current_selection))
-		{
-			StrCat(buffer, sizeof(buffer), " [+]");
-			AddMenuItem(menu, current_selection, buffer, ITEMDRAW_DISABLED);
-		}
-		else
-		{
-			AddMenuItem(menu, current_selection, buffer);
-		}
-	}
-	
-	if (!GetMenuItemCount(menu))
-	{
-		CloseHandle(menu);
-		KvRewind(hKv);
-		return false;
-	}
-
-	DisplayMenu(menu, client, MENU_TIME_FOREVER);
-
-	KvRewind(hKv);
-	return true;
-}
-
-public SkinSelectionMenu_Handler(Handle:menu, MenuAction:action, param1, param2)
-{
-	switch (action)
-	{
-		case MenuAction_End :
-		{
-			CloseHandle(menu);
-		}
-		case MenuAction_Cancel :
-		{
-			if (param2 == MenuCancel_ExitBack)
-			{
-				Menu_ShowWeapon(param1, szWeapon[param1], sTitle[param1]);
-			}
-		}
-		case MenuAction_Select :
-		{
-			if (!CanSetCustomModel(param1))
-			{
-				CPrintToChat(param1, "%T", "Chat_NoAccess", param1);
-				return;
-			}
-			
-			decl String:sInfo[64];
-			GetMenuItem(menu, param2, sInfo, sizeof(sInfo));
-			
-			// Parse the skin selection (format: modelname_skin_X)
-			decl String:model_name[64], String:skin_str[8];
-			new pos = FindCharInString(sInfo, '_', true);
-			if (pos != -1)
-			{
-				// Check if it contains "_skin_" pattern
-				decl String:temp[64];
-				strcopy(temp, sizeof(temp), sInfo);
-				temp[pos] = '\0';
-				
-				// Look for "_skin_" pattern
-				new skin_pattern_pos = FindCharInString(temp, '_', true);
-				if (skin_pattern_pos != -1)
-				{
-					decl String:pattern[8];
-					strcopy(pattern, sizeof(pattern), temp[skin_pattern_pos + 1]);
-					if (StrEqual(pattern, "skin"))
-					{
-						// Extract model name (everything before "_skin_")
-						strcopy(model_name, sizeof(model_name), temp);
-						model_name[skin_pattern_pos] = '\0';
-						
-						// Extract skin number (everything after "_skin_")
-						strcopy(skin_str, sizeof(skin_str), sInfo[pos + 1]);
-					}
-					else
-					{
-						strcopy(model_name, sizeof(model_name), sInfo);
-						skin_str[0] = '0';
-					}
-				}
-				else
-				{
-					strcopy(model_name, sizeof(model_name), sInfo);
-					skin_str[0] = '0';
-				}
-			}
-			else
-			{
-				strcopy(model_name, sizeof(model_name), sInfo);
-				skin_str[0] = '0';
-			}
-			
-			decl Handle:hCookie;
-			if (GetTrieValue(hTrie_Cookies, szWeapon[param1], hCookie))
-			{
-						SetClientCookie(param1, hCookie, sInfo);
-			}
-			else
-			{
-				LogError("Cookie is not registered for %s", szWeapon[param1]);
-				PrintToChat(param1, "Cookie is not registered for %s", szWeapon[param1]);
-			}
-			
-			new weapon = CSPlayer_GetActiveWeapon(param1);
-			if (CheckWeapon(param1, weapon))
-			{
-				OnWeaponChanged(param1, weapon, CSViewModel_GetSequence(ClientVM[param1]));
-			}
-			else
-			{
-				for (new i = 0; i < Type_Max; i++)
-				{
-					if (WeaponAddons[param1][i] > 0)
-					{
-						switch (i)
-						{
-							case Type_Primary :
-							{
-								weapon = GetPlayerWeaponSlot(param1, 0);
-							}
-							case Type_C4 :
-							{
-								weapon = GetPlayerWeaponSlot(param1, 4);
-							}
-						}
-						
-						if (CheckWeapon(param1, weapon))
-						{
-							OnWeaponEquipPost(param1, weapon);
-							OldBits[param1] = 0;
-						}
-					}
-				}
-			}
-			
-			// Return to weapon menu after skin selection
-			Menu_ShowWeapon(param1, szWeapon[param1], sTitle[param1]);
-		}
-	}
 }
 
 Action:Function_OnWeaponSwitch(Handle:plugin, Function:func_weapon_switch, client, weapon, predicted_viewmodel, old_sequence, &new_sequence, bool:switch_from = true, &bool:custom_change = false)

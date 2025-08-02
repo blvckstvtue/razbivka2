@@ -198,10 +198,11 @@ public OnPluginStart()
 	CreateConVar("sm_custom_weapons_version", PLUGIN_VERSION, "Custom Weapons Version", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
 	hCvar_Enable = CreateConVar("sm_custom_weapons_enable", "1", "Enable/Disable custom weapons", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	hCvar_AdminFlags = CreateConVar("sm_custom_weapons_admin", "", "Admin flag required to use custom weapons (leave empty to allow all)", FCVAR_NOTIFY);
-	hCvar_WeaponsPath = CreateConVar("sm_custom_weapons_path", "configs/custom_weapons.txt", "Path to custom weapons config file");
-	hCvar_DownloadsPath = CreateConVar("sm_custom_weapons_downloads", "configs/custom_weapons_downloads.txt", "Path to downloads list");
+	bCvar_Enable = GetConVarBool(hCvar_Enable);
+
 	hCvar_OldStyleModelChange = CreateConVar("sm_custom_weapons_oldstyle", "0", "Use old style model changing (for CS:S v34 and older)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	hCvar_MenuCloseNotice = CreateConVar("sm_custom_weapons_menu_close_notice", "1", "Show notice when menu is closed", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	bCvar_MenuCloseNotice = GetConVarBool(hCvar_MenuCloseNotice);
 
 	HookConVarChange(hCvar_Enable, OnConVarChange);
 	HookConVarChange(hCvar_MenuCloseNotice, OnConVarChange);
@@ -3636,10 +3637,13 @@ stock ClearKV(Handle:kv)
 
 stock StringToLower(const String:input[], String:output[], size)
 {
+	if (size <= 0) return;
+	
 	size--;
+	new len = strlen(input);
+	if (len > size) len = size;
 
-	new x = 0;
-	while (input[x] != '\0' || x < size)
+	for (new x = 0; x < len; x++)
 	{
 		if (IsCharUpper(input[x]))
 		{
@@ -3649,9 +3653,7 @@ stock StringToLower(const String:input[], String:output[], size)
 		{
 			output[x] = input[x];
 		}
-		
-		x++;
 	}
 
-	output[x] = '\0';
+	output[len] = '\0';
 }

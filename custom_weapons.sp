@@ -2278,14 +2278,15 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 						if (KvGotoFirstSubKey(hKv))
 						{
 							decl String:map[128];
+							decl String:soundBuffer[PLATFORM_MAX_PATH];
 							do
 							{
-								KvGetSectionName(hKv, buffer, sizeof(buffer));
-								if (buffer[0] && IsSoundFile(buffer))
+								KvGetSectionName(hKv, soundBuffer, sizeof(soundBuffer));
+								if (soundBuffer[0] && IsSoundFile(soundBuffer))
 								{
 									new cached_sequence = KvGetNum(hKv, "sequence", 0);
 									FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
-									SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+									SetTrieString(g_hTrieSounds[client][0], map, soundBuffer, true);
 									
 									decl any:sInfo[4];
 									sInfo[0] = KvGetNum(hKv, "individual", 0);

@@ -1438,7 +1438,7 @@ public OnPostThinkPost_Old(client)
 						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
 						{
 							decl any:sInfo[4];
-							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo), 0);
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
 							if (g_bDev[client])
 							{
 								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
@@ -1605,7 +1605,7 @@ public OnPostThinkPost(client)
 						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer), 0))
 						{
 							decl any:sInfo[4];
-							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo), 0);
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
 							if (g_bDev[client])
 							{
 								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo[0], sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
@@ -1978,6 +1978,14 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								while (KvGotoNextKey(hKv, true));
 							}
 						}
+						else
+						{
+							// Enable original game sounds for all sequences when no Sounds section is present
+							for (new i = 0; i < 14; i++)
+							{
+								HasSoundAt[client][i] = true;
+							}
+						}
 						
 						new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
 						
@@ -2227,6 +2235,14 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								}
 							}
 							while (KvGotoNextKey(hKv, true));
+						}
+					}
+					else
+					{
+						// Enable original game sounds for all sequences when no Sounds section is present
+						for (new i = 0; i < 14; i++)
+						{
+							HasSoundAt[client][i] = true;
 						}
 					}
 					
@@ -3398,7 +3414,7 @@ public Action:CSS_Hook_ShotgunShot(const String:te_name[], const Players[], numC
 				new WeaponIndex = CSPlayer_GetActiveWeapon(client);
 				if (WeaponIndex != -1)
 				{
-					new offset = FindDataMapOffs(WeaponIndex, "m_bSilencerOn");
+					new offset = FindDataMapOffs(WeaponIndex, "m_bSilencerOn", 0, 0);
 					if (offset == -1 || !GetEntData(WeaponIndex, offset, 4))
 					{
 						decl Float:vOrigin[3], Float:vAngles[3];

@@ -21,6 +21,7 @@ enum SoundType {
 new Handle:g_hTrieSounds[MAXPLAYERS+1][2];
 new bool:HasSoundAt[MAXPLAYERS+1][14];
 new bool:StopSounds[MAXPLAYERS+1];
+new bool:HasSoundSection[MAXPLAYERS+1];
 
 #define GAME_UNDEFINED 0
 #define GAME_CSS_34 1
@@ -167,13 +168,27 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 {
 	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == SNDCHAN_WEAPON || channel == SNDCHAN_AUTO) && volume > 0.0)
 	{
-		// Only stop default weapon sounds if the weapon has custom sounds configured
+		// ВАЖНО: Логика от patch_fix_decompiled.sp
+		// Ако НЯМ секция "Sounds" изобщо -> позволяваме оригиналните звуци
+		if (!HasSoundSection[entity])
+		{
+			return Plugin_Continue;
+		}
+		
+		// Ако ИМА секция "Sounds":
+		// 1. stop_all_sounds = 1 -> спираме всички звуци
+		// 2. Има custom звук за тази последователност -> спираме оригиналните
+		// 3. Няма custom звук за тази последователност -> позволяваме оригиналните
+		
 		new weapon = CSPlayer_GetActiveWeapon(entity);
 		if (weapon != -1)
 		{
 			new Sequence = CSViewModel_GetSequence(ClientVM[entity]);
-			// Stop default sounds only if this weapon has custom sounds OR stop_all_sounds is enabled
-			if (HasSoundAt[entity][Sequence] || StopSounds[entity])
+			
+			// Спираме звуците само ако:
+			// - stop_all_sounds е включено ИЛИ 
+			// - има custom звук за тази конкретна последователност
+			if (StopSounds[entity] || HasSoundAt[entity][Sequence])
 			{
 				return Plugin_Stop;
 			}
@@ -881,6 +896,7 @@ public OnClientDisconnect_Post(client)
 		HasSoundAt[client][i] = false;
 	}
 	StopSounds[client] = false;
+	HasSoundSection[client] = false;
 	
 	for (new i = 0; i < Type_Max; i++)
 	{
@@ -1400,26 +1416,27 @@ public OnPostThinkPost_Old(client)
 	{
 		if (IsCustom[client])
 		{
-			CSViewModel_AddEffects(ClientVM2[client], EF_NODRAW);
-			CSViewModel_RemoveEffects(ClientVM[client], EF_NODRAW);
-			
-			IsCustom[client] = false;
-			
-			OldSequence[client] = 0;
-	
-			iCycle[client] = 0;
-			next_cycle[client] = 0.0;
-			
-			ClearTrie(g_hTrieSounds[client][0]);
-			ClearTrie(g_hTrieSounds[client][1]);
-			ClearTrie(g_hTrieSequence[client]);
-			
-			// Clear sound flags
-			for (new i = 0; i < 14; i++)
-			{
-				HasSoundAt[client][i] = false;
-			}
-			StopSounds[client] = false;
+					CSViewModel_AddEffects(ClientVM2[client], EF_NODRAW);
+		CSViewModel_RemoveEffects(ClientVM[client], EF_NODRAW);
+		
+		IsCustom[client] = false;
+		
+		OldSequence[client] = 0;
+
+		iCycle[client] = 0;
+		next_cycle[client] = 0.0;
+		
+		ClearTrie(g_hTrieSounds[client][0]);
+		ClearTrie(g_hTrieSounds[client][1]);
+		ClearTrie(g_hTrieSequence[client]);
+		
+		// Clear sound flags
+		for (new i = 0; i < 14; i++)
+		{
+			HasSoundAt[client][i] = false;
+		}
+		StopSounds[client] = false;
+		HasSoundSection[client] = false;
 			
 			NextSeq[client] = 0.0;
 			
@@ -1592,10 +1609,11 @@ public OnPostThinkPost(client)
 			for (new i = 0; i < 14; i++)
 			{
 				HasSoundAt[client][i] = false;
-			}
-			StopSounds[client] = false;
-			
-			NextSeq[client] = 0.0;
+					}
+		StopSounds[client] = false;
+		HasSoundSection[client] = false;
+		
+		NextSeq[client] = 0.0;
 			
 			Function_OnWeaponSwitch(hPlugin[client], weapon_switch[client], client, WeaponIndex, ClientVM[client], OldSequence[client], Sequence);
 			
@@ -2099,6 +2117,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		HasSoundAt[client][i] = false;
 	}
 	StopSounds[client] = false;
+	HasSoundSection[client] = false;
 	
 	iCycle[client] = 0;
 	next_cycle[client] = 0.0;
@@ -2275,6 +2294,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					// Load sounds from the Sounds section
 					if (KvJumpToKey(hKv, "Sounds"))
 					{
+						HasSoundSection[client] = true;  // Маркираме че има Sounds секция
 						StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", 0);
 						if (KvGotoFirstSubKey(hKv))
 						{

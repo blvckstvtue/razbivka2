@@ -2000,6 +2000,15 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								}
 							}
 						}
+						else
+						{
+							// For AWP weapons, ensure no custom sounds are loaded and original sounds are allowed
+							StopSounds[client] = false;
+							for (new i = 0; i < 14; i++)
+							{
+								HasSoundAt[client][i] = false;
+							}
+						}
 
 						
 						new bool:b_flip_model = bool:KvGetNum(hKv, "flip_view_model", false);
@@ -2254,6 +2263,15 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 								}
 								while (KvGotoNextKey(hKv, true));
 							}
+						}
+					}
+					else
+					{
+						// For AWP weapons, ensure no custom sounds are loaded and original sounds are allowed
+						StopSounds[client] = false;
+						for (new i = 0; i < 14; i++)
+						{
+							HasSoundAt[client][i] = false;
 						}
 					}
 
@@ -3407,7 +3425,7 @@ AddInFrontOf(const Float:vecOrigin[3], const Float:vecAngle[3], Float:units, Flo
 
 public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &entity, &channel, &Float:volume, &level, &pitch, &flags)
 {
-	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == 1 || channel == 3) && volume > 0)
+	if (0 < entity <= MaxClients && (channel == 1 || channel == 3) && volume > 0)
 	{
 		// Check if we have custom sounds defined for this weapon
 		new WeaponIndex = CSPlayer_GetActiveWeapon(entity);
@@ -3425,37 +3443,35 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 			// Check if this is an AWP weapon (awp category)
 			if (StrEqual(ClassName[start_index], "awp", false))
 			{
-				// Allow original AWP sounds to play for all AWP category weapons
+				// For AWP weapons, always allow original sounds to play
+				// Don't block any sounds for AWP category weapons
 				return Plugin_Continue;
 			}
 			
-			// Check if we have any custom sounds defined for this weapon
-			new bool:hasCustomSounds = false;
-			for (new i = 0; i < 14; i++)
+			// Only process custom sounds if player is using custom models
+			if (IsCustom[entity])
 			{
-				if (HasSoundAt[entity][i])
+				// Check if we have any custom sounds defined for this weapon
+				new bool:hasCustomSounds = false;
+				for (new i = 0; i < 14; i++)
 				{
-					hasCustomSounds = true;
-					break;
+					if (HasSoundAt[entity][i])
+					{
+						hasCustomSounds = true;
+						break;
+					}
+				}
+				
+				// If we have custom sounds defined, block original sounds
+				if (hasCustomSounds)
+				{
+					channel = 0;
+					return Plugin_Changed;
 				}
 			}
 			
-			// If we have custom sounds defined, block original sounds
-			if (hasCustomSounds)
-			{
-				channel = 0;
-				return Plugin_Changed;
-			}
-			// If no custom sounds defined, allow original sounds to play
-			else
-			{
-				return Plugin_Continue;
-			}
-		}
-		else
-		{
-			channel = 0;
-			return Plugin_Changed;
+			// If no custom sounds defined or not using custom models, allow original sounds to play
+			return Plugin_Continue;
 		}
 	}
 	return Plugin_Continue;

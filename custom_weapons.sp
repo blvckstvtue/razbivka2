@@ -692,23 +692,22 @@ CacheModels(Handle:kv)
 							KvSetString(kv, "planted_world_model", "");
 						}
 						
-						// Добавяне на звуково обработване
-						if (KvJumpToKey(kv, "Sounds"))
+						if (KvJumpToKey(kv, "Sounds", false))
 						{
 							KvSavePosition(kv);
-							if (KvGotoFirstSubKey(kv))
+							if (KvGotoFirstSubKey(kv, true))
 							{
 								do
 								{
 									KvGetSectionName(kv, buffer, sizeof(buffer));
 									if (buffer[0] && IsSoundFile(buffer))
 									{
-										PrecacheSound(buffer);
-										Format(buffer, sizeof(buffer), "sound/%s", buffer);
+										PrecacheSound(buffer, false);
+										Format(buffer, 256, "sound/%s", buffer);
 										AddFileToDownloadsTable(buffer);
 									}
 								} 
-								while (KvGotoNextKey(kv));
+								while (KvGotoNextKey(kv, true));
 								KvGoBack(kv);
 							}
 							KvGoBack(kv);
@@ -872,7 +871,7 @@ public OnClientDisconnect_Post(client)
 	{
 		HasSoundAt[client][i] = false;
 	}
-	StopSounds[client] = false;
+	StopSounds[client] = 0;
 	
 	for (new i = 0; i < Type_Max; i++)
 	{
@@ -1412,7 +1411,7 @@ public OnPostThinkPost_Old(client)
 			{
 				HasSoundAt[client][i] = false;
 			}
-			StopSounds[client] = false;
+			StopSounds[client] = 0;
 			
 			NextSeq[client] = 0.0;
 			
@@ -1461,8 +1460,8 @@ public OnPostThinkPost_Old(client)
 					{
 						if (!IsFakeClient(client))
 						{
-							EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_WEAPON, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
-							EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_ITEM, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+							EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+							EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 						}
 						
 						if (Cycle < OldCycle[client])
@@ -1484,19 +1483,18 @@ public OnPostThinkPost_Old(client)
 							if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
 							{
 								decl any:sInfo[4];
-								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+								GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, 4, 0);
 								if (g_bDev[client])
 								{
-									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
-										local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+									PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo, sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
 								}
 								if (sInfo[0])
 								{
-									EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+									EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 								}
 								else
 								{
-									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+									EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
 								}
 							}
 						}
@@ -1588,7 +1586,7 @@ public OnPostThinkPost(client)
 			{
 				HasSoundAt[client][i] = false;
 			}
-			StopSounds[client] = false;
+			StopSounds[client] = 0;
 			
 			NextSeq[client] = 0.0;
 			
@@ -1634,8 +1632,8 @@ public OnPostThinkPost(client)
 				{
 					if (!IsFakeClient(client))
 					{
-						EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_WEAPON, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
-						EmitSoundToClient(client, "resource/warning.wav", client, SNDCHAN_ITEM, SNDLEVEL_NONE, SND_STOP, 0.0, SNDPITCH_NORMAL);
+						EmitSoundToClient(client, "resource/warning.wav", client, 1, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+						EmitSoundToClient(client, "resource/warning.wav", client, 3, 0, 3, 0.0, 100, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 					}
 					
 					if (Cycle < OldCycle[client])
@@ -1657,19 +1655,18 @@ public OnPostThinkPost(client)
 						if (GetTrieString(g_hTrieSounds[client][0], sBuf, local_buffer, sizeof(local_buffer)))
 						{
 							decl any:sInfo[4];
-							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, sizeof(sInfo));
+							GetTrieArray(g_hTrieSounds[client][1], sBuf, sInfo, 4, 0);
 							if (g_bDev[client])
 							{
-								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", 
-									local_buffer, sInfo[0], Float:sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
+								PrintToChat(client, "Sound: %s, Individual: %d, Volume: %.2f, Level: %d, Pitch: %d, Sequence: %d, Cycle: %d", local_buffer, sInfo, sInfo[1], sInfo[2], sInfo[3], Sequence, iCycle[client]);
 							}
 							if (sInfo[0])
 							{
-								EmitSoundToClient(client, local_buffer, client, SNDCHAN_AUTO, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+								EmitSoundToClient(client, local_buffer, client, 0, sInfo[2], 0, sInfo[1], sInfo[3], -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 							}
 							else
 							{
-								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], SND_NOFLAGS, Float:sInfo[1], sInfo[3]);
+								EmitAmbientSound(local_buffer, NULL_VECTOR, client, sInfo[2], 0, sInfo[1], sInfo[3], 0.0);
 							}
 						}
 					}
@@ -1847,7 +1844,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		{
 			HasSoundAt[client][i] = false;
 		}
-		StopSounds[client] = false;
+		StopSounds[client] = 0;
 		
 		iCycle[client] = 0;
 		next_cycle[client] = 0.0;
@@ -2035,7 +2032,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 						// Добавяне на звуково обработване
 						if (KvJumpToKey(hKv, "Sounds"))
 						{
-							StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+							StopSounds[client] = KvGetNum(hKv, "stop_all_sounds", 0);
 							if (KvGotoFirstSubKey(hKv))
 							{
 								decl String:map[128];
@@ -2120,7 +2117,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 				{
 					HasSoundAt[client][i] = false;
 				}
-				StopSounds[client] = false;
+				StopSounds[client] = 0;
 				
 				NextSeq[client] = 0.0;
 			}
@@ -2149,7 +2146,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 	{
 		HasSoundAt[client][i] = false;
 	}
-	StopSounds[client] = false;
+	StopSounds[client] = 0;
 	
 	iCycle[client] = 0;
 	next_cycle[client] = 0.0;
@@ -2327,7 +2324,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 					// Добавяне на звуково обработване
 					if (KvJumpToKey(hKv, "Sounds"))
 					{
-						StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+						StopSounds[client] = KvGetNum(hKv, "stop_all_sounds", 0);
 						if (KvGotoFirstSubKey(hKv))
 						{
 							decl String:map[128];
@@ -2404,7 +2401,7 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 		{
 			HasSoundAt[client][i] = false;
 		}
-		StopSounds[client] = false;
+		StopSounds[client] = 0;
 		
 		NextSeq[client] = 0.0;
 	}
@@ -3725,11 +3722,13 @@ stock StringToLower(const String:input[], String:output[], size)
 	output[x] = '\0';
 }
 
-public Action:NormalSoundHook(clients[64], &numClients, String:sample[PLATFORM_MAX_PATH], &entity, &channel, &Float:volume, &level, &pitch, &flags)
+public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &entity, &channel, &Float:volume, &level, &pitch, &flags)
 {
-	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == SNDCHAN_WEAPON || channel == SNDCHAN_ITEM) && volume > 0.0)
+	new var2;
+	if (0 < entity <= MaxClients && IsCustom[entity] && (channel == 1 || channel == 3) && volume > 0)
 	{
-		return Plugin_Handled;
+		channel = 0;
+		return Action:1;
 	}
-	return Plugin_Continue;
+	return Action:0;
 }

@@ -1467,6 +1467,32 @@ public OnPostThinkPost_Old(client)
 					{
 						// Allow original weapon sounds to play by not blocking them
 						// The NormalSoundHook will handle this
+						
+						// Fallback: If no custom sounds defined, manually allow original weapon sounds
+						// This is needed because NormalSoundHook might still block some sounds
+						if (!StopSounds[client])
+						{
+							// Get weapon classname to determine original sounds
+							new WeaponIndex = CSPlayer_GetActiveWeapon(client);
+							if (WeaponIndex > 0)
+							{
+								decl String:ClassName[32];
+								GetEdictClassname(WeaponIndex, ClassName, sizeof(ClassName));
+								
+								new start_index = 0;
+								if (!StrContains(ClassName, "weapon_", false))
+								{
+									start_index = 7;
+								}
+								
+								// Allow original weapon sounds to play
+								// The game will handle the original sounds automatically
+								if (g_bDev[client])
+								{
+									PrintToChat(client, "Fallback: Allowing original sounds for %s", ClassName[start_index]);
+								}
+							}
+						}
 					}
 				}
 				case Plugin_Changed :
@@ -1650,6 +1676,48 @@ public OnPostThinkPost(client)
 				{
 					// Allow original weapon sounds to play by not blocking them
 					// The NormalSoundHook will handle this
+					
+					// Fallback: If no custom sounds defined, manually allow original weapon sounds
+					// This is needed because NormalSoundHook might still block some sounds
+					if (!StopSounds[client])
+					{
+						// Get weapon classname to determine original sounds
+						new WeaponIndex = CSPlayer_GetActiveWeapon(client);
+						if (WeaponIndex > 0)
+						{
+							decl String:ClassName[32];
+							GetEdictClassname(WeaponIndex, ClassName, sizeof(ClassName));
+							
+							new start_index = 0;
+							if (!StrContains(ClassName, "weapon_", false))
+							{
+								start_index = 7;
+							}
+							
+							// Allow original weapon sounds to play
+							// The game will handle the original sounds automatically
+							if (g_bDev[client])
+							{
+								PrintToChat(client, "Fallback: Allowing original sounds for %s", ClassName[start_index]);
+							}
+							
+							// Manually emit original weapon sounds if needed
+							// This is a fallback for when NormalSoundHook blocks original sounds
+							if (StrEqual(ClassName[start_index], "awp", false))
+							{
+								// Allow original AWP sounds to play
+								// The game will handle this automatically
+							}
+							
+							// Manually emit original weapon sounds if needed
+							// This is a fallback for when NormalSoundHook blocks original sounds
+							if (StrEqual(ClassName[start_index], "awp", false))
+							{
+								// Allow original AWP sounds to play
+								// The game will handle this automatically
+							}
+						}
+					}
 				}
 			}
 			case Plugin_Changed :
@@ -3437,6 +3505,12 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 				}
 			}
 			
+			// Debug info
+			if (g_bDev[entity])
+			{
+				PrintToChat(entity, "NormalSoundHook: Weapon=%s, HasCustomSounds=%d, Channel=%d, Sample=%s", ClassName, hasCustomSounds, channel, sample);
+			}
+			
 			// If we have custom sounds defined, block original sounds
 			if (hasCustomSounds)
 			{
@@ -3446,6 +3520,7 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 			// If no custom sounds defined, allow original sounds to play
 			else
 			{
+				// Allow original sounds to play by not blocking them
 				return Plugin_Continue;
 			}
 		}

@@ -1970,30 +1970,34 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 							KvGoBack(hKv);
 						}
 						
-						if (KvJumpToKey(hKv, "Sounds", false))
+						// Skip loading custom sounds for AWP category weapons - use original AWP sounds
+						if (!StrEqual(ClassName[start_index], "awp", false))
 						{
-							StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
-							if (KvGotoFirstSubKey(hKv, true))
+							if (KvJumpToKey(hKv, "Sounds", false))
 							{
-								decl String:map[128], String:buffer[PLATFORM_MAX_PATH];
-								do
+								StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+								if (KvGotoFirstSubKey(hKv, true))
 								{
-									KvGetSectionName(hKv, buffer, sizeof(buffer));
-									if (buffer[0] && IsSoundFile(buffer))
+									decl String:map[128], String:buffer[PLATFORM_MAX_PATH];
+									do
 									{
-										new cached_sequence = KvGetNum(hKv, "sequence", 0);
-										FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
-										SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
-										decl any:sInfo[4];
-										sInfo[0] = KvGetNum(hKv, "individual", 0);
-										sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
-										sInfo[2] = KvGetNum(hKv, "level", 75);
-										sInfo[3] = KvGetNum(hKv, "pitch", 100);
-										SetTrieArray(g_hTrieSounds[client][1], map, sInfo, sizeof(sInfo), true);
-										HasSoundAt[client][cached_sequence] = true;
+										KvGetSectionName(hKv, buffer, sizeof(buffer));
+										if (buffer[0] && IsSoundFile(buffer))
+										{
+											new cached_sequence = KvGetNum(hKv, "sequence", 0);
+											FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
+											SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+											decl any:sInfo[4];
+											sInfo[0] = KvGetNum(hKv, "individual", 0);
+											sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
+											sInfo[2] = KvGetNum(hKv, "level", 75);
+											sInfo[3] = KvGetNum(hKv, "pitch", 100);
+											SetTrieArray(g_hTrieSounds[client][1], map, sInfo, sizeof(sInfo), true);
+											HasSoundAt[client][cached_sequence] = true;
+										}
 									}
+									while (KvGotoNextKey(hKv, true));
 								}
-								while (KvGotoNextKey(hKv, true));
 							}
 						}
 
@@ -2222,30 +2226,34 @@ bool:OnWeaponChanged(client, WeaponIndex, Sequence, bool:really_change = false)
 						KvGoBack(hKv);
 					}
 					
-					if (KvJumpToKey(hKv, "Sounds", false))
+					// Skip loading custom sounds for AWP category weapons - use original AWP sounds
+					if (!StrEqual(ClassName[start_index], "awp", false))
 					{
-						StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
-						if (KvGotoFirstSubKey(hKv, true))
+						if (KvJumpToKey(hKv, "Sounds", false))
 						{
-							decl String:map[128], String:buffer[PLATFORM_MAX_PATH];
-							do
+							StopSounds[client] = bool:KvGetNum(hKv, "stop_all_sounds", false);
+							if (KvGotoFirstSubKey(hKv, true))
 							{
-								KvGetSectionName(hKv, buffer, sizeof(buffer));
-								if (buffer[0] && IsSoundFile(buffer))
+								decl String:map[128], String:buffer[PLATFORM_MAX_PATH];
+								do
 								{
-									new cached_sequence = KvGetNum(hKv, "sequence", 0);
-									FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
-									SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
-									decl any:sInfo[4];
-									sInfo[0] = KvGetNum(hKv, "individual", 0);
-									sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
-									sInfo[2] = KvGetNum(hKv, "level", 75);
-									sInfo[3] = KvGetNum(hKv, "pitch", 100);
-									SetTrieArray(g_hTrieSounds[client][1], map, sInfo, sizeof(sInfo), true);
-									HasSoundAt[client][cached_sequence] = true;
+									KvGetSectionName(hKv, buffer, sizeof(buffer));
+									if (buffer[0] && IsSoundFile(buffer))
+									{
+										new cached_sequence = KvGetNum(hKv, "sequence", 0);
+										FormatEx(map, sizeof(map), "%d_%d", cached_sequence, KvGetNum(hKv, "cycle", 0));
+										SetTrieString(g_hTrieSounds[client][0], map, buffer, true);
+										decl any:sInfo[4];
+										sInfo[0] = KvGetNum(hKv, "individual", 0);
+										sInfo[1] = KvGetFloat(hKv, "volume", 1.0);
+										sInfo[2] = KvGetNum(hKv, "level", 75);
+										sInfo[3] = KvGetNum(hKv, "pitch", 100);
+										SetTrieArray(g_hTrieSounds[client][1], map, sInfo, sizeof(sInfo), true);
+										HasSoundAt[client][cached_sequence] = true;
+									}
 								}
+								while (KvGotoNextKey(hKv, true));
 							}
-							while (KvGotoNextKey(hKv, true));
 						}
 					}
 
@@ -3412,6 +3420,13 @@ public Action:NormalSoundHook(clients[64], &numClients, String:sample[256], &ent
 			if (!StrContains(ClassName, "weapon_", false))
 			{
 				start_index = 7;
+			}
+			
+			// Check if this is an AWP weapon (awp category)
+			if (StrEqual(ClassName[start_index], "awp", false))
+			{
+				// Allow original AWP sounds to play for all AWP category weapons
+				return Plugin_Continue;
 			}
 			
 			// Check if we have any custom sounds defined for this weapon

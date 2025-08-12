@@ -10,6 +10,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Функция за определяне на базовия URL (за работа с reverse proxy)
+function getBaseUrl() {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
+                || $_SERVER['SERVER_PORT'] == 443
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    
+    $protocol = $isHttps ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+    
+    // Проверяваме за reverse proxy prefix
+    $prefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+    
+    return $protocol . '://' . $host . $prefix;
+}
+
 // Конфигурация на сървърите
 $servers = [
     'zescape' => [
@@ -87,7 +102,8 @@ class DemoManager {
                         'mtime' => $stat['mtime'],
                         'mtimeFormatted' => $this->formatDate($stat['mtime']),
                         'url' => "/{$serverId}/" . urlencode($entry),
-                        'downloadUrl' => "/{$serverId}/" . urlencode($entry)
+                        'downloadUrl' => "/{$serverId}/" . urlencode($entry),
+                        'fullUrl' => getBaseUrl() . "/{$serverId}/" . urlencode($entry)
                     ];
                 }
             }

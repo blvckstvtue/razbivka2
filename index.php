@@ -11,6 +11,21 @@ $servers = [
     ]
 ];
 
+// Функция за определяне на базовия URL (за работа с reverse proxy)
+function getBaseUrl() {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
+                || $_SERVER['SERVER_PORT'] == 443
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    
+    $protocol = $isHttps ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+    
+    // Проверяваме за reverse proxy prefix
+    $prefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+    
+    return $protocol . '://' . $host . $prefix;
+}
+
 // Получаваме избрания сървър от URL параметър
 $selectedServer = $_GET['server'] ?? 'zescape';
 if (!array_key_exists($selectedServer, $servers)) {
@@ -42,7 +57,8 @@ function getDemoFiles($path) {
                 'name' => $entry,
                 'size' => $stat['size'],
                 'mtime' => $stat['mtime'],
-                'url' => "/{$GLOBALS['selectedServer']}/" . urlencode($entry)
+                'url' => "/{$GLOBALS['selectedServer']}/" . urlencode($entry),
+                'fullUrl' => getBaseUrl() . "/{$GLOBALS['selectedServer']}/" . urlencode($entry)
             ];
         }
     }

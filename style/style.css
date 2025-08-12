@@ -1,0 +1,372 @@
+ 
+
+/* ======= Reset Styles ======= */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ======= Global Styles ======= */
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: #0f1015;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  color: #efefef;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+a, .navbar .item, .subbar .item {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover, .navbar .item:hover, .subbar .item:hover {
+  color: #6366f1;
+}
+
+/* ======= Header Styles ======= */
+
+.header {
+  background: #0f1015;
+  display: flex;
+  align-items: center;
+  height: 100px;
+}
+
+/* ======= Footer Styles ======= */
+
+.footer {
+  background-color: #13141b;
+  top: auto !important;
+  bottom: 0px !important;
+  position: absolute;
+  width: 100%;
+}
+
+.footer > .layout_container {
+  padding: 20px 15px;
+}
+
+.footer a {
+  font-weight: 700;
+}
+
+/* ======= Flex Styles ======= */
+
+.flex {
+  display: flex;
+  justify-content: space-evenly;
+}
+
+.flex-jc\:center {
+  justify-content: center;
+}
+
+.flex-jc\:space-between {
+  justify-content: space-between;
+}
+
+.flex-jc\:end {
+  justify-content: flex-end;
+}
+
+.flex-jc\:start {
+  justify-content: flex-start;
+}
+
+.flex-ai\:center {
+  align-items: center;
+}
+
+.flex-ai\:start {
+  align-items: flex-start;
+}
+
+.flex-ai\:end {
+  align-items: flex-end;
+}
+
+.flex-fd\:column {
+  flex-direction: column;
+}
+
+.flex-wrap\:wrap {
+  flex-wrap: wrap;
+}
+
+.flex\:11 {
+  flex: 1;
+  width: 100%;
+}
+
+/* ======= Navbar Styles ======= */
+
+.navbar {
+  font-size: 16px;
+  color: #fff;
+  font-weight: 600;
+  background: rgb(131, 58, 180);
+  background: linear-gradient(45deg, #0f172a 0%, #6366f1 70%, #5855eb 100%);
+}
+
+.navbar .item {
+  display: inline-block;
+  padding: 15px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.navbar .item:hover {
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.navbar .item a:hover {
+  color: #fff;
+}
+
+/* ======= Subbar Styles ======= */
+
+.subbar {
+  background-color: #0c0d10;
+  font-size: 15px;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}
+
+.subbar .item {
+  display: inline-block;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.subbar .item:hover {
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.subbar .item a:hover {
+  color: #fff;
+}
+
+.subbar .item.active {
+  background: linear-gradient(to left, rgb(0,0,0,0), rgb(0,0,0,.35)), #6366f1 !important;
+  color: #fff;
+}
+
+/* ======= Server Styles ======= */
+
+.server {
+  text-align: center;
+  padding: 15px;
+  font-size: 14px;
+  width: 60%;
+  height: 510px;
+  overflow: auto;
+  box-shadow: inset 0px 0px 10px 2px rgba(0,0,0,0.45);
+}
+
+td {
+  border-bottom: 1px solid #333;
+  padding: 5px;
+}
+
+/* ======= Button Styles ======= */
+
+.button {
+  background: #fb5c23;
+  font-size: 14.0px;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: 0.1s all linear;
+  cursor: pointer;
+  user-select: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 1;
+  width: 130px;
+  margin: auto;
+  color: #ffffff !important;
+  position: relative;
+}
+
+.button:hover {
+  background: #ff6700;
+}
+
+.button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: #6366f1; 
+  transition: left 0.5s ease;
+  z-index: -1;
+}
+
+.button:hover::before {
+  left: 0;
+}
+
+/* ======= Tips Styles ======= */
+
+.tipsArea {
+  border-bottom: 1px solid #333;
+  padding: 5px;
+}
+
+.tip {
+  display: inline-block;
+  background-color: #6366f1;
+  color: #fff;
+  padding: 5px;
+  text-align: center;
+  border-radius: 2px; 
+  font-size: 13px;
+}
+
+/* ======= IpsMessage Styles ======= */
+
+.ipsMessage_theme {
+  background: #e07800;
+}
+
+.ipsMessage_general {
+  background: #70767d;
+}
+
+.ipsMessage_info {
+  background: #2981bf;
+}
+
+.ipsMessage_warning {
+  background: #e06d22;
+}
+
+.ipsMessage_error {
+  background: #ff0000;
+}
+
+.ipsMessage_success {
+  background: #2a884b;
+}
+
+.ipsType_medium {
+  font-size: 13.0px;
+}
+
+.ipsType_reset {
+  margin: 0;
+}
+
+.ipsMargin_vertical, .ipsMargin_bottom {
+  margin-bottom: 20px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ipsMessage, .ipsAnnouncement {
+  border-radius: 4px;
+  position: relative;
+  margin-bottom: 12px;
+  color: #fff;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: inset rgb(255 255 255 / 10%) 0px 1px 0px;
+  padding: 16px 48px 16px 48px;
+  width: fit-content;
+  font-size: medium;
+}
+
+.ipsWidget.ipsWidget_horizontal:not(.ipsWidgetHide) {
+  margin-bottom: 10px;
+}
+
+.ipsBox, #ipsLayout_mainArea > .ipsForm[action$='do=edit'] > .ipsForm {
+  box-shadow: 0px 2px 4px -1px #21232d, 0.1 );
+  border-radius: 4px;
+  background-color: rgb(12 13 16);
+}
+
+/* ======= Scrollbar Styles ======= */
+
+/* width */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  box-shadow: inset 0 0 5px grey; 
+  border-radius: 0;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #6366f1; 
+  border-radius: 5px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #6366f1; 
+}
+
+/* ======= Mobile Responsive Styles ======= */
+
+@media (max-width: 768px) {
+  .server {
+    width: 95%;
+    height: 400px;
+  }
+  
+  .navbar .item {
+    padding: 10px;
+    font-size: 14px;
+  }
+  
+  .subbar .item {
+    padding: 8px;
+    font-size: 13px;
+  }
+  
+  .footer > .layout_container {
+    padding: 15px 10px;
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .footer .flex {
+    margin-bottom: 10px;
+  }
+  
+  table {
+    font-size: 12px;
+  }
+  
+  .button {
+    width: 100px;
+    padding: 8px 15px;
+    font-size: 12px;
+  }
+}

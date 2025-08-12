@@ -6,7 +6,7 @@
 set -e  # Спира при грешка
 
 # Конфигурация (ПРОМЕНЕТЕ ТЕЗИ СТОЙНОСТИ!)
-DOMAIN="demos.yourdomain.com"  # Заменете с вашия домейн
+DOMAIN="zanedemos.zone.id"  # Заменете с вашия домейн
 SERVER_MACHINE_IP="192.168.1.100"  # IP на сървър машината
 WEB_MACHINE_IP="192.168.1.101"  # IP на уеб машината
 DEMO_SITE_DIR="/home/martink1337/hub/demosite"
